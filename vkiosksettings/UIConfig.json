@@ -1,0 +1,26 @@
+{
+  "page": {
+    "label": "Kiosk settings"
+  },
+  "sections": [
+   {
+      "id": "kiosk",
+      "element": "section",
+      "label": "kiosk Settings",
+      "icon": "fa-plug",
+
+      "content": [
+        {
+                "id": "screensettings",
+                "element": "button",
+                "label": "Set the screen",
+                "onClick": {
+                  "type": "plugin",
+                  "endpoint": "user_interface/vkiosksettings",
+                  "method": "screensettings"
+                }
+      	  }
+      ]
+   }
+  ]
+}
