@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+export DISPLAY=:0.0
+
+# Find the primary display
+display=$(xrandr | grep " connected" | awk '{ print $1 }' | head -n 1)
+
+# Apply rotation
+xrandr --output "$display" --rotate "normal"
+
+echo "Screen rotated to ${rotatescreen}"

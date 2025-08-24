@@ -6,20 +6,48 @@
    {
       "id": "kiosk",
       "element": "section",
-      "label": "kiosk Settings",
+      "label": "Rotation",
       "icon": "fa-plug",
-
+      			"onSave": {
+				"type": "controller",
+				"endpoint": "user_interface/vkiosksettings",
+				"method": "rotatescreen"
+			},
+			"saveButton": {
+				"label": "APPLY",
+				"data": [
+					"rotatescreen"
+				]
+			},
       "content": [
-        {
-                "id": "screensettings",
-                "element": "button",
-                "label": "Set the screen",
-                "onClick": {
-                  "type": "plugin",
-                  "endpoint": "user_interface/vkiosksettings",
-                  "method": "screensettings"
-                }
-      	  }
+         {
+          "id": "rotatescreen",
+          "element": "select",
+          "doc": "Choose screen rotation",
+          "label": "Display rotation",
+          "value": {
+            "value": "",
+            "label": ""
+          },
+          "options": [
+            {
+              "value": "normal",
+              "label": "normal"
+            },
+            {
+              "value": "left",
+              "label": "left"
+            },
+            {
+              "value": "right",
+              "label": "right"
+            },
+            {
+              "value": "inverted",
+              "label": "inverted"
+            }
+          ]
+        }
       ]
    }
   ]

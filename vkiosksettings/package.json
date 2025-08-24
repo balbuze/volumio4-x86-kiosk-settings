@@ -1,34 +1,35 @@
 {
-	"name": "vkiosksettings",
-	"version": "0.0.1",
-	"description": "Set your screen and keyboard",
-	"main": "index.js",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
-	},
-	"author": "Balbuze",
-	"license": "",
-	"repository": "https://github.com/balbuze/volumio4-x86-kiosk-settings",
-	"volumio_info": {
-		"prettyName": "Kiosk-settings",
-		"plugin_type": "user_interface",
-		"icon": "fa-info-circle",
-		"architectures": [
-			"amd64"
-		],
-		"os": [
-			"bookworm"
-		],
-		"details": "Kiosk settings",
-		"changelog": ""
-	},
-	"engines": {
-		"node": ">=20",
-		"volumio": ">=4"
-	},
-	"dependencies": {
-		"fs-extra": "*",
-		"kew": "*",
-		"v-conf": "*"
-	}
+  "name": "vkiosksettings",
+  "version": "0.0.1",
+  "description": "Set your screen and keyboard",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Balbuze",
+  "license": "",
+  "repository": "https://github.com/balbuze/volumio4-x86-kiosk-settings",
+  "volumio_info": {
+    "prettyName": "Kiosk-settings",
+    "plugin_type": "user_interface",
+    "icon": "fa-info-circle",
+    "architectures": [
+      "amd64"
+    ],
+    "os": [
+      "bookworm"
+    ],
+    "details": "Kiosk settings",
+    "changelog": "",
+    "manually_installed": true
+  },
+  "engines": {
+    "node": ">=20",
+    "volumio": ">=4"
+  },
+  "dependencies": {
+    "fs-extra": "*",
+    "kew": "*",
+    "v-conf": "*"
+  }
 }
