@@ -18,5 +18,7 @@ WantedBy=multi-user.target
 EOC
 
 systemctl daemon-reload
+
+sudo chmod +x /data/plugins/user_interface/vkiosksettings/*.sh
 #required to end the plugin install
 echo "plugininstallend"
