@@ -3,24 +3,25 @@
     "label": "Kiosk settings"
   },
   "sections": [
-   {
+    {
       "id": "kiosk",
       "element": "section",
       "label": "Rotation",
       "icon": "fa-plug",
-      			"onSave": {
-				"type": "controller",
-				"endpoint": "user_interface/vkiosksettings",
-				"method": "rotatescreen"
-			},
-			"saveButton": {
-				"label": "APPLY",
-				"data": [
-					"rotatescreen"
-				]
-			},
+      "onSave": {
+        "type": "controller",
+        "endpoint": "user_interface/vkiosksettings",
+        "method": "rotatescreen"
+      },
+      "saveButton": {
+        "label": "APPLY",
+        "data": [
+          "rotatescreen",
+          "touchcorrection"
+        ]
+      },
       "content": [
-         {
+        {
           "id": "rotatescreen",
           "element": "select",
           "doc": "Choose screen rotation",
@@ -47,8 +48,36 @@
               "label": "inverted"
             }
           ]
+        },
+        {
+          "id": "touchcorrection",
+          "element": "select",
+          "doc": "Adjust touchscreen orientation offset",
+          "label": "Touchscreen correction",
+          "value": {
+            "value": "none",
+            "label": "none"
+          },
+          "options": [
+            {
+              "value": "none",
+              "label": "none"
+            },
+            {
+              "value": "swap-lr",
+              "label": "swap left/right"
+            },
+            {
+              "value": "swap-ud",
+              "label": "swap up/down"
+            },
+            {
+              "value": "swap-both",
+              "label": "swap both (180°)"
+            }
+          ]
         }
       ]
-   }
+    }
   ]
 }
