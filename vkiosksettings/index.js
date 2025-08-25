@@ -150,6 +150,11 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].value.label', rvalue.label);
 
 
+         var tcvalue = self.config.get('touchcorrection') || { value: "none", label: "none" };
+
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.value', tcvalue.value);
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
+
          defer.resolve(uiconf);
       })
       .fail(function () {

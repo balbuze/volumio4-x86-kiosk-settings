@@ -53,7 +53,7 @@
           "id": "touchcorrection",
           "element": "select",
           "doc": "Adjust touchscreen orientation offset",
-          "label": "Touchscreen correction",
+          "label": "Touch rotation",
           "value": {
             "value": "none",
             "label": "none"
