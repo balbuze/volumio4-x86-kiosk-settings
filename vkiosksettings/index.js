@@ -211,7 +211,7 @@ vkiosksettings.prototype.applyscreensettings = function () {
    if (hidecursor) {
       var phidecursor = "unclutter-xfixes -idle 2 -root"
    } else {
-      var phidecursor = ""
+      var phidecursor = "pkill unclutter"
    }
 
    fs.readFile(__dirname + "/rotatescreen.sh.tmpl", "utf8", function (err, data) {
