@@ -155,6 +155,9 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.value', tcvalue.value);
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
 
+         var hidecursor = self.config.get('hidecursor', false);
+         uiconf.sections[0].content[2].value = hidecursor;
+
          defer.resolve(uiconf);
       })
       .fail(function () {
@@ -181,51 +184,61 @@ vkiosksettings.prototype.setConf = function (varName, varValue) {
 };
 
 vkiosksettings.prototype.rotatescreen = function (data) {
-  const self = this;
+   const self = this;
 
-  self.config.set('rotatescreen', {
-    value: data['rotatescreen'].value,
-    label: data['rotatescreen'].label
-  });
+   self.config.set('rotatescreen', {
+      value: data['rotatescreen'].value,
+      label: data['rotatescreen'].label
+   });
 
-  self.config.set('touchcorrection', {
-    value: data['touchcorrection'].value,
-    label: data['touchcorrection'].label
-  });
+   self.config.set('touchcorrection', {
+      value: data['touchcorrection'].value,
+      label: data['touchcorrection'].label
+   });
 
-  self.applyrotatescreen();
+   self.config.set('hidecursor', data['hidecursor'])
+
+   self.applyscreensettings();
 };
 
-vkiosksettings.prototype.applyrotatescreen = function () {
-  const self = this;
-  const defer = libQ.defer();
+vkiosksettings.prototype.applyscreensettings = function () {
+   const self = this;
+   const defer = libQ.defer();
 
-  const rotatescreen = self.config.get("rotatescreen").value;
-  const touchcorrection = self.config.get("touchcorrection").value;
+   const rotatescreen = self.config.get("rotatescreen").value;
+   const touchcorrection = self.config.get("touchcorrection").value;
+   const hidecursor = self.config.get("hidecursor")
+   if (hidecursor) {
+      var phidecursor = "unclutter-xfixes -idle 2 -root"
+   } else {
+      var phidecursor = ""
+   }
 
-  fs.readFile(__dirname + "/rotatescreen.sh.tmpl", "utf8", function (err, data) {
-    if (err) {
-      self.logger.error("Template read error: " + err);
-      return defer.reject(new Error(err));
-    }
-
-    // Replace both variables independently
-    let conf1 = data.replace("${rotatescreen}", rotatescreen);
-    conf1 = conf1.replace("${touchcorrection}", touchcorrection);
-
-    const scriptPath = "/data/plugins/user_interface/vkiosksettings/rotatescreen.sh";
-
-    fs.writeFile(scriptPath, conf1, { encoding: "utf8", mode: 0o755 }, function (err) {
+   fs.readFile(__dirname + "/rotatescreen.sh.tmpl", "utf8", function (err, data) {
       if (err) {
-        self.logger.error("Script write error: " + err);
-        defer.reject(new Error(err));
-      } else {
-        self.logger.info(`Rotation script updated: display=${rotatescreen}, touchscreen=${touchcorrection}`);
-        self.restartvkiosksettingsservice();
-        defer.resolve();
+         self.logger.error("Template read error: " + err);
+         return defer.reject(new Error(err));
       }
-    });
-  });
 
-  return defer.promise;
+      // Replace both variables independently
+      let conf1 = data.replace("${rotatescreen}", rotatescreen);
+      conf1 = conf1.replace("${touchcorrection}", touchcorrection);
+      conf1 = conf1.replace("${hidecursor}", phidecursor);
+
+
+      const scriptPath = "/data/plugins/user_interface/vkiosksettings/rotatescreen.sh";
+
+      fs.writeFile(scriptPath, conf1, { encoding: "utf8", mode: 0o755 }, function (err) {
+         if (err) {
+            self.logger.error("Script write error: " + err);
+            defer.reject(new Error(err));
+         } else {
+            self.logger.info(`Rotation script updated: display=${rotatescreen}, touchscreen=${touchcorrection}`);
+            self.restartvkiosksettingsservice();
+            defer.resolve();
+         }
+      });
+   });
+   self.commandRouter.pushToastMessage('success', '✅Settings applied!');
+   return defer.promise;
 };

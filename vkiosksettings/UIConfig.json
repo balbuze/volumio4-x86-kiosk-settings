@@ -17,7 +17,8 @@
         "label": "APPLY",
         "data": [
           "rotatescreen",
-          "touchcorrection"
+          "touchcorrection",
+          "hidecursor"
         ]
       },
       "content": [
@@ -76,6 +77,12 @@
               "label": "swap both (180°)"
             }
           ]
+        },
+         {
+          "id": "hidecursor",
+          "element": "switch",
+          "label": "Hide mouse cursor",
+          "value": false
         }
       ]
     }

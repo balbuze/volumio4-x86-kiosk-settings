@@ -1,6 +1,9 @@
 #!/bin/bash
 echo "Installing Kiosk settings"
 
+sudo apt update
+sudo apt install -y unclutter-xfixes
+
 cat > /etc/systemd/system/vkiosksettings.service <<EOC
 [Unit]
 Description=vkiosksettings Daemon 

@@ -27,3 +27,6 @@ esac
 if [ -n "$touchscreen" ]; then
   xinput set-prop "$touchscreen" "Coordinate Transformation Matrix" $matrix
 fi
+
+# Hide mouse cursor
+${hidecursor}
