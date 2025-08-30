@@ -11,14 +11,16 @@
       "onSave": {
         "type": "controller",
         "endpoint": "user_interface/vkiosksettings",
-        "method": "rotatescreen"
+        "method": "savescreensettings"
       },
       "saveButton": {
         "label": "APPLY",
         "data": [
           "rotatescreen",
           "touchcorrection",
-          "hidecursor"
+          "hidecursor",
+          "timeout",
+          "noifplay"
         ]
       },
       "content": [
@@ -78,11 +80,39 @@
             }
           ]
         },
-         {
+        {
           "id": "hidecursor",
           "element": "switch",
           "label": "Hide mouse cursor",
           "value": false
+        },
+        {
+          "id": "timeout",
+          "element": "input",
+          "type":"number",
+          "doc": "Set the duration before screensaver in seconds. 0 = no screensaver ",
+          "label": "Screensaver in ",
+            "attributes": [
+            {
+              "placeholder": {}
+            },
+            {
+              "maxlength": 4
+            },
+            {
+              "min": 0
+            },
+            {
+              "max": 3600
+            }
+          ],
+          "value": 120
+        },
+         {
+          "id": "noifplay",
+          "element": "switch",
+          "label": "No screensaver when playing",
+          "value": true
         }
       ]
     }

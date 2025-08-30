@@ -1,11 +1,32 @@
 #!/bin/bash
 set -e
-export DISPLAY=:0.0
+export DISPLAY=:0
 
-# Find the primary display
-display=$(xrandr | grep " connected" | awk '{ print $1 }' | head -n 1)
-
-# Apply rotation
+# Rotate screen
+display=$(xrandr | grep " connected" | awk '{ print $1 }' | head -n1)
 xrandr --output "$display" --rotate "normal"
 
-echo "Screen rotated to ${rotatescreen}"
+# Rotate touchscreen input independently
+touchscreen=$(xinput list | grep -i 'Goodix' | grep -o 'id=[0-9]*' | cut -d= -f2 | head -n1)
+
+case "none" in
+  none)
+    matrix="1 0 0  0 1 0  0 0 1"
+    ;;
+  swap-lr)
+    matrix="0 -1 1  1 0 0  0 0 1"
+    ;;
+  swap-ud)
+    matrix="-1 0 1  0 -1 1  0 0 1"
+    ;;
+  swap-both)
+    matrix="0 1 0  -1 0 1  0 0 1"
+    ;;
+esac
+
+if [ -n "$touchscreen" ]; then
+  xinput set-prop "$touchscreen" "Coordinate Transformation Matrix" $matrix
+fi
+
+# Hide mouse cursor
+pkill unclutter

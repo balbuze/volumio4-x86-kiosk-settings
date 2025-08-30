@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-export DISPLAY=:0.0
+export DISPLAY=${display}
 
 # Rotate screen
 display=$(xrandr | grep " connected" | awk '{ print $1 }' | head -n1)
