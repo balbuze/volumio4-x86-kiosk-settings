@@ -1,6 +1,6 @@
 {
   "page": {
-    "label": "Kiosk settings"
+    "label": "TRANSLATE.TITLE"
   },
   "sections": [
     {
@@ -14,7 +14,7 @@
         "method": "savescreensettings"
       },
       "saveButton": {
-        "label": "APPLY",
+        "label": "TRANSLATE.APPLY",
         "data": [
           "rotatescreen",
           "touchcorrection",
@@ -27,8 +27,8 @@
         {
           "id": "rotatescreen",
           "element": "select",
-          "doc": "Choose screen rotation",
-          "label": "Display rotation",
+          "doc": "TRANSLATE.DISPLAY_ROT_DOC",
+          "label": "TRANSLATE.DISPLAY_ROT",
           "value": {
             "value": "",
             "label": ""
@@ -36,27 +36,27 @@
           "options": [
             {
               "value": "normal",
-              "label": "normal"
+              "label": "TRANSLATE.NORMAL"
             },
             {
               "value": "left",
-              "label": "left"
+              "label": "TRANSLATE.LEFT"
             },
             {
               "value": "right",
-              "label": "right"
+              "label": "TRANSLATE.RIGHT"
             },
             {
               "value": "inverted",
-              "label": "inverted"
+              "label": "TRANSLATE.INVERTED"
             }
           ]
         },
         {
           "id": "touchcorrection",
           "element": "select",
-          "doc": "Adjust touchscreen orientation offset",
-          "label": "Touch rotation",
+          "doc": "TRANSLATE.TOUCH_ROT_DOC",
+          "label": "TRANSLATE.TOUCH_ROT",
           "value": {
             "value": "none",
             "label": "none"
@@ -64,26 +64,28 @@
           "options": [
             {
               "value": "none",
-              "label": "none"
+              "label": "TRANSLATE.TR_NONE"
             },
             {
               "value": "swap-lr",
-              "label": "swap left/right"
+              "label": "TRANSLATE.TR_SWLR"
             },
             {
               "value": "swap-ud",
-              "label": "swap up/down"
+              "label": "TRANSLATE.TR_SWUD"
             },
             {
               "value": "swap-both",
-              "label": "swap both (180°)"
+              "label": "TRANSLATE.TR_BOTH"
             }
           ]
         },
         {
           "id": "hidecursor",
           "element": "switch",
-          "label": "Hide mouse cursor",
+          "label": "TRANSLATE.MOUSE_C",
+          "doc": "TRANSLATE.MOUSE_C_DOC",
+
           "value": false
         },
         {
@@ -91,7 +93,7 @@
           "element": "input",
           "type":"number",
           "doc": "Set the duration before screensaver in seconds. 0 = no screensaver ",
-          "label": "Screensaver in ",
+          "label": "TRANSLATE.SCREENSAVER",
             "attributes": [
             {
               "placeholder": {}
@@ -111,7 +113,8 @@
          {
           "id": "noifplay",
           "element": "switch",
-          "label": "No screensaver when playing",
+          "label": "TRANSLATE.NO_SS_IF_PLAY",
+          "doc":"TRANSLATE.NO_SS_IF_PLAY_DOC",
           "value": true
         }
       ]

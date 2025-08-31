@@ -1,0 +1,22 @@
+{
+  "TITLE": "Configuración del Kiosco",
+  "APPLY": "Aplicar",
+  "DISPLAY_ROT": "Rotación de la pantalla",
+  "DISPLAY_ROT_DOC": "Elige cómo quieres rotar la pantalla.",
+  "NORMAL": "Normal",
+  "LEFT": "Izquierda",
+  "RIGHT": "Derecha",
+  "INVERTED": "Invertida",
+  "TOUCH_ROT": "Rotación de la pantalla táctil",
+  "TOUCH_ROT_DOC": "En algunos sistemas, puede diferir de la rotación de pantalla. Ajusta aquí.",
+  "TR_NONE": "Ninguna",
+  "TR_SWLR": "Intercambiar izquierda/derecha",
+  "TR_SWUD": "Intercambiar arriba/abajo",
+  "TR_BOTH": "Intercambiar ambos (180°)",
+  "MOUSE_C": "Ocultar el cursor del ratón",
+  "MOUSE_C_DOC": "Si está habilitado, el cursor del ratón se oculta cuando no se utiliza.",
+  "SCREENSAVER": "Activar protector de pantalla en (s)",
+  "SCREENSAVER_DOC": "Configura el tiempo de espera en segundos antes del protector de pantalla. 0 = sin protector.",
+  "NO_SS_IF_PLAY": "Desactivar protector al reproducir",
+  "NO_SS_IF_PLAY_DOC": "Desactiva el protector de pantalla durante la reproducción. El tiempo se aplica después de detener."
+}

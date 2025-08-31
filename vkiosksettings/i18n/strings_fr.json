@@ -1,0 +1,22 @@
+{
+  "TITLE": "Paramètres du Kiosque",
+  "APPLY": "Appliquer",
+  "DISPLAY_ROT": "Rotation de l’écran",
+  "DISPLAY_ROT_DOC": "Choisissez comment vous souhaitez faire pivoter l’écran.",
+  "NORMAL": "Normal",
+  "LEFT": "Gauche",
+  "RIGHT": "Droite",
+  "INVERTED": "Inversé",
+  "TOUCH_ROT": "Rotation de l’écran tactile",
+  "TOUCH_ROT_DOC": "Sur certains systèmes, peut être différent de la rotation de l’écran. Ajustez ici.",
+  "TR_NONE": "Aucune",
+  "TR_SWLR": "Inverser gauche/droite",
+  "TR_SWUD": "Inverser haut/bas",
+  "TR_BOTH": "Inverser les deux (180°)",
+  "MOUSE_C": "Masquer le curseur de la souris",
+  "MOUSE_C_DOC": "Si activé, le curseur de la souris est masqué lorsqu’il n’est pas utilisé.",
+  "SCREENSAVER": "Activer l’économiseur d’écran en (s)",
+  "SCREENSAVER_DOC": "Définissez le délai avant l’activation de l’économiseur d’écran en secondes. 0 = aucun économiseur.",
+  "NO_SS_IF_PLAY": "Désactiver l’économiseur lors de la lecture",
+  "NO_SS_IF_PLAY_DOC": "Désactive l’économiseur d’écran pendant la lecture. Le délai s’applique après l’arrêt."
+}

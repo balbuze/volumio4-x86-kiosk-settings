@@ -1,0 +1,22 @@
+{
+  "TITLE": "Kiosk-Einstellungen",
+  "APPLY": "Anwenden",
+  "DISPLAY_ROT": "Bildschirmdrehung",
+  "DISPLAY_ROT_DOC": "Wählen Sie, wie Sie den Bildschirm drehen möchten.",
+  "NORMAL": "Normal",
+  "LEFT": "Links",
+  "RIGHT": "Rechts",
+  "INVERTED": "Umgekehrt",
+  "TOUCH_ROT": "Touchscreen-Drehung",
+  "TOUCH_ROT_DOC": "Auf einigen Systemen kann dies von der Bildschirmdrehung abweichen. Hier anpassen.",
+  "TR_NONE": "Keine",
+  "TR_SWLR": "Links/Rechts tauschen",
+  "TR_SWUD": "Oben/Unten tauschen",
+  "TR_BOTH": "Beides tauschen (180°)",
+  "MOUSE_C": "Mauszeiger ausblenden",
+  "MOUSE_C_DOC": "Wenn aktiviert, wird der Mauszeiger ausgeblendet, wenn er nicht benutzt wird.",
+  "SCREENSAVER": "Bildschirmschoner aktivieren nach (s)",
+  "SCREENSAVER_DOC": "Legen Sie die Zeit in Sekunden fest, bevor der Bildschirmschoner aktiviert wird. 0 = kein Bildschirmschoner.",
+  "NO_SS_IF_PLAY": "Bildschirmschoner bei Wiedergabe deaktivieren",
+  "NO_SS_IF_PLAY_DOC": "Deaktiviert den Bildschirmschoner während der Wiedergabe. Der Timeout gilt nach dem Stopp."
+}

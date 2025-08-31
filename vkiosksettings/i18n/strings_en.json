@@ -1,3 +1,23 @@
 {
-    
+    "TITLE":"Kiosk Settings",
+    "APPLY":"Apply",
+    "DISPLAY_ROT":"Display Rotation",
+    "DISPLAY_ROT_DOC":"Choose how you want to rotate the display.",
+    "NORMAL":"Normal",
+    "LEFT":"Left",
+    "RIGHT":"Right",
+    "INVERTED":"Inverted",
+    "TOUCH_ROT":"Touchscreen rotation",
+    "TOUCH_ROT_DOC":"On some system, may be different from Display Rotation. Adjust here.",
+    "TR_NONE":"None",
+    "TR_SWLR":"Swap Left/Right",
+    "TR_SWUD":"Swap up/down",
+    "TR_BOTH":"Swap both (180°)",
+    "MOUSE_C":"Hide mouse cursor",
+    "MOUSE_C_DOC":"If enabled, the mouse cursor is hidden when not use.",
+    "SCREENSAVER":"Enable screen saver in (s)",
+    "SCREENSAVER_DOC":"Set the timeout before screensaver in seconds. 0 = no screensaver.",
+    "NO_SS_IF_PLAY":"Disable screensaver when playing",
+    "NO_SS_IF_PLAY_DOC":"Disable screensaver when playing. Timeout is aplied when stop plyaing."
+
 }
