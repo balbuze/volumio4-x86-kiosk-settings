@@ -1,1 +1,1 @@
-{"rotatescreen":{"value":{"value":"normal","label":"normal"}}}
+{"rotatescreen":{"value":{"value":"normal","label":"normal"}},"touchcorrection":{"value":{"value":"none","label":"none"}},"hidecursor":{"type":"boolean","value":false},"timeout":{"type":"number","value":120},"noifplay":{"type":"boolean","value":true}}
