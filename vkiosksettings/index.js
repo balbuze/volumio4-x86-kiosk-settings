@@ -394,7 +394,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
          self.commandRouter.pushToastMessage(
             'success',
             ' ✅ Screen settings applied'
-           
+
          );
       }
       self.config.set('timeout', timeout);
@@ -411,6 +411,92 @@ vkiosksettings.prototype.savescreensettings = function (data) {
 };
 
 
+// Find touchscreen device ID or name
+//vkiosksettings.prototype.detectTouchscreen = function () {
+   function detectTouchscreen() {
+   return new Promise((resolve, reject) => {
+      exec("xinput list", (error, stdout, stderr) => {
+         if (error) {
+            return reject(`xinput error: ${stderr}`);
+         }
+
+         // Try to find a line containing "touchscreen" (case-insensitive)
+         const lines = stdout.split("\n");
+         const touchscreenLine = lines.find(line =>
+            /touchscreen/i.test(line)
+         );
+
+         if (!touchscreenLine) {
+            return resolve(null);
+         }
+
+         // Extract ID (id=xx)
+         const match = touchscreenLine.match(/id=(\d+)/);
+         if (match) {
+            return resolve(match[1]); // return ID
+         }
+
+         // fallback: return full device name
+         const name = touchscreenLine.replace(/\s*id=\d+.*/, "").trim();
+         return resolve(name);
+      });
+   });
+}
+/*
+vkiosksettings.prototype.applyscreensettings = async function () {
+  const self = this;
+  const defer = libQ.defer();
+  const display = self.getDisplaynumber();
+
+  const rotatescreen = self.config.get("rotatescreen").value;
+  const touchcorrection = self.config.get("touchcorrection").value;
+  const hidecursor = self.config.get("hidecursor");
+
+  // build cursor command
+  const phidecursor = hidecursor
+    ? "unclutter-xfixes -idle 2 -root"
+    : "pkill unclutter";
+
+  try {
+    const touchscreenId = await detectTouchscreen();
+    self.logger.info(`Detected touchscreen: ${touchscreenId || "none"}`);
+
+    // Build matrix depending on correction
+    let matrix = "1 0 0  0 1 0  0 0 1";
+    switch (touchcorrection) {
+      case "swap-lr":
+        matrix = "0 -1 1  1 0 0  0 0 1";
+        break;
+      case "swap-ud":
+        matrix = "-1 0 1  0 -1 1  0 0 1";
+        break;
+      case "swap-both":
+        matrix = "0 1 0  -1 0 1  0 0 1";
+        break;
+    }
+
+    // Rotate screen
+    exec(`DISPLAY=:${display} xrandr --output DSI-1 --rotate ${rotatescreen}`);
+    
+    // Rotate touchscreen
+    if (touchscreenId) {
+      exec(
+        `DISPLAY=:${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`
+      );
+    }
+
+    // Hide cursor
+    exec(`DISPLAY=:${display} ${phidecursor}`);
+
+    defer.resolve();
+  } catch (err) {
+    self.logger.error("applyscreensettings error: " + err);
+    defer.reject(err);
+  }
+
+  return defer.promise;
+};
+*/
 
 vkiosksettings.prototype.applyscreensettings = function () {
    const self = this;
