@@ -1,4 +1,4 @@
-//vkiosksettings - balbuze August2025
+//vkiosksettings - balbuze September 2025
 'use strict';
 
 var libQ = require('kew');
@@ -58,10 +58,12 @@ vkiosksettings.prototype.onStart = function () {
    var self = this;
    var defer = libQ.defer();
    self.socket = io.connect('http://localhost:3000');
-   self.startvkiosksettingsservice();
-   self.getDisplaynumber();
+   self.fixXauthority();
+   // self.startvkiosksettingsservice();
    setTimeout(function () {
-      self.checkIfPlay()
+      self.checkIfPlay();
+      self.getDisplaynumber();
+      self.applyscreensettings();
 
    }, 2000);
    defer.resolve();
@@ -185,6 +187,18 @@ vkiosksettings.prototype.getUIConfig = function () {
 };
 
 
+vkiosksettings.prototype.refreshUI = function () {
+   const self = this;
+
+   setTimeout(function () {
+      var respconfig = self.commandRouter.getUIConfigOnPlugin('user_interface', 'vkiosksettings', {});
+      respconfig.then(function (config) {
+         self.commandRouter.broadcastMessage('pushUiConfig', config);
+      });
+      self.commandRouter.closeModals();
+   }, 100);
+}
+
 vkiosksettings.prototype.setUIConfig = function (data) {
    var self = this;
    //Perform your installation tasks here
@@ -203,93 +217,65 @@ vkiosksettings.prototype.setConf = function (varName, varValue) {
 // Define once
 vkiosksettings.prototype.getDisplaynumber = function () {
    try {
+      let display;
+
       if (process.env.DISPLAY) {
-         return process.env.DISPLAY;
-      }
-      //
-      const { execSync } = require("child_process");
+         display = process.env.DISPLAY;
+      } else {
+         const { execSync } = require("child_process");
 
-      // Check Xorg processes
-      let output = execSync("ps -ef | grep -m1 '[X]org' || true", { encoding: "utf8" });
-      let match = output.match(/Xorg\s+(:\d+)/);
-      if (match) {
-         return match[1];
-      }
-
-      // Try xdpyinfo if installed
-      try {
-         let xdpy = execSync("xdpyinfo 2>/dev/null | grep 'name of display'", { encoding: "utf8" });
-         let xmatch = xdpy.match(/:([0-9]+)/);
-         if (xmatch) {
-            return ":" + xmatch[1];
+         // Check Xorg processes
+         let output = execSync("ps -ef | grep -m1 '[X]org' || true", { encoding: "utf8" });
+         let match = output.match(/Xorg\s+(:\d+)/);
+         if (match) {
+            display = match[1];
+         } else {
+            // Try xdpyinfo if installed
+            try {
+               let xdpy = execSync("xdpyinfo 2>/dev/null | grep 'name of display'", { encoding: "utf8" });
+               let xmatch = xdpy.match(/:([0-9]+)/);
+               if (xmatch) {
+                  display = ":" + xmatch[1];
+               }
+            } catch (e) {
+               // ignore
+            }
          }
-      } catch (e) {
-         // ignore
       }
 
       // Default fallback
-      return ":0";
+      if (!display) display = ":0";
+
+      // Export to environment for all child processes
+      process.env.DISPLAY = display;
+
+      return display;
    } catch (err) {
       this.logger.error("detectDisplay() error: " + err);
+      process.env.DISPLAY = ":0";
       return ":0";
    }
 };
 
+vkiosksettings.prototype.fixXauthority = function () {
+  const self = this;
 
-vkiosksettings.prototype.refreshUI = function () {
-   const self = this;
+  return new Promise((resolve, reject) => {
+    const cmd = `if [ -f /root/.Xauthority ]; then cp /root/.Xauthority /home/volumio/ && chown volumio:volumio /home/volumio/.Xauthority; fi`;
 
-   setTimeout(function () {
-      var respconfig = self.commandRouter.getUIConfigOnPlugin('user_interface', 'vkiosksettings', {});
-      respconfig.then(function (config) {
-         self.commandRouter.broadcastMessage('pushUiConfig', config);
-      });
-      self.commandRouter.closeModals();
-   }, 100);
-}
-/*
-vkiosksettings.prototype.savescreensettings = function (data) {
-   const self = this;
+    const fullCmd = `/bin/echo volumio | /usr/bin/sudo -S /bin/bash -c '${cmd}'`;
 
-   self.config.set('rotatescreen', {
-      value: data['rotatescreen'].value,
-      label: data['rotatescreen'].label
-   });
-
-   self.config.set('touchcorrection', {
-      value: data['touchcorrection'].value,
-      label: data['touchcorrection'].label
-   });
-
-   self.config.set('hidecursor', data['hidecursor']);
-
-   // ✅ validate timeout
-   let timeout = parseInt(data['timeout'], 10);
-   if (isNaN(timeout)) {
-      self.logger.warn('[vkiosksettings] Invalid timeout value, using default 120');
-      timeout = 120;
-   } else {
-      if (timeout < 0) {
-         self.logger.warn('[vkiosksettings] Timeout < 0, clamped to 0');
-         timeout = 0;
+    exec(fullCmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+      if (error) {
+        self.logger.error("fixXauthority failed: " + (stderr || error.message));
+        return reject(error);
       }
-      if (timeout > 1000) {
-         self.logger.warn('[vkiosksettings] Timeout > 1000, clamped to 1000');
-         timeout = 1000;
-      }
-   }
-   self.config.set('timeout', timeout);
-
-   self.config.set('noifplay', data.noifplay);
-
-   if (timeout === 0) {
-      self.wakeupScreen();
-   }
-
-   self.checkIfPlay();
-   self.applyscreensettings();
+      self.logger.info("fixXauthority: /home/volumio/.Xauthority updated");
+      resolve(stdout);
+    });
+  });
 };
-*/
+
 
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
@@ -410,133 +396,73 @@ vkiosksettings.prototype.savescreensettings = function (data) {
    self.applyscreensettings();
 };
 
+vkiosksettings.prototype.detectTouchscreen = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
 
-// Find touchscreen device ID or name
-//vkiosksettings.prototype.detectTouchscreen = function () {
-   function detectTouchscreen() {
    return new Promise((resolve, reject) => {
-      exec("xinput list", (error, stdout, stderr) => {
+      exec(`DISPLAY=${display} xinput list`, (error, stdout, stderr) => {
          if (error) {
-            return reject(`xinput error: ${stderr}`);
+            return reject(`xinput error: ${stderr || error.message}`);
          }
 
-         // Try to find a line containing "touchscreen" (case-insensitive)
          const lines = stdout.split("\n");
-         const touchscreenLine = lines.find(line =>
+
+         // Find all lines containing "touchscreen"
+         const matches = lines.filter(line =>
             /touchscreen/i.test(line)
          );
 
-         if (!touchscreenLine) {
-            return resolve(null);
+         if (matches.length === 0) {
+            return resolve(null); // no touchscreen found
          }
 
-         // Extract ID (id=xx)
-         const match = touchscreenLine.match(/id=(\d+)/);
-         if (match) {
-            return resolve(match[1]); // return ID
-         }
+         // Extract IDs and names
+         const devices = matches.map(line => {
+            const idMatch = line.match(/id=(\d+)/);
+            const id = idMatch ? idMatch[1] : null;
+            const name = line.replace(/\s*id=\d+.*/, "").trim();
+            return { id, name };
+         });
 
-         // fallback: return full device name
-         const name = touchscreenLine.replace(/\s*id=\d+.*/, "").trim();
-         return resolve(name);
+         self.logger.info("Touchscreens detected: " + JSON.stringify(devices));
+         resolve(devices[0].id || devices[0].name);
       });
    });
-}
-/*
-vkiosksettings.prototype.applyscreensettings = async function () {
-  const self = this;
-  const defer = libQ.defer();
-  const display = self.getDisplaynumber();
-
-  const rotatescreen = self.config.get("rotatescreen").value;
-  const touchcorrection = self.config.get("touchcorrection").value;
-  const hidecursor = self.config.get("hidecursor");
-
-  // build cursor command
-  const phidecursor = hidecursor
-    ? "unclutter-xfixes -idle 2 -root"
-    : "pkill unclutter";
-
-  try {
-    const touchscreenId = await detectTouchscreen();
-    self.logger.info(`Detected touchscreen: ${touchscreenId || "none"}`);
-
-    // Build matrix depending on correction
-    let matrix = "1 0 0  0 1 0  0 0 1";
-    switch (touchcorrection) {
-      case "swap-lr":
-        matrix = "0 -1 1  1 0 0  0 0 1";
-        break;
-      case "swap-ud":
-        matrix = "-1 0 1  0 -1 1  0 0 1";
-        break;
-      case "swap-both":
-        matrix = "0 1 0  -1 0 1  0 0 1";
-        break;
-    }
-
-    // Rotate screen
-    exec(`DISPLAY=:${display} xrandr --output DSI-1 --rotate ${rotatescreen}`);
-    
-    // Rotate touchscreen
-    if (touchscreenId) {
-      exec(
-        `DISPLAY=:${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`
-      );
-    }
-
-    // Hide cursor
-    exec(`DISPLAY=:${display} ${phidecursor}`);
-
-    defer.resolve();
-  } catch (err) {
-    self.logger.error("applyscreensettings error: " + err);
-    defer.reject(err);
-  }
-
-  return defer.promise;
 };
-*/
 
-vkiosksettings.prototype.applyscreensettings = function () {
+vkiosksettings.prototype.applyscreensettings = async function () {
    const self = this;
-   const defer = libQ.defer();
    const display = self.getDisplaynumber();
 
    const rotatescreen = self.config.get("rotatescreen").value;
    const touchcorrection = self.config.get("touchcorrection").value;
-   const hidecursor = self.config.get("hidecursor")
-   if (hidecursor) {
-      var phidecursor = "unclutter-xfixes -idle 2 -root"
-   } else {
-      var phidecursor = "pkill unclutter"
-   }
+   const hidecursor = self.config.get("hidecursor");
 
-   fs.readFile(__dirname + "/rotatescreen.sh.tmpl", "utf8", function (err, data) {
-      if (err) {
-         self.logger.error("Template read error: " + err);
-         return defer.reject(new Error(err));
+   const phidecursor = hidecursor
+      ? "unclutter-xfixes -idle 2 -root"
+      : "pkill unclutter";
+
+   try {
+      const touchscreenId = await self.detectTouchscreen();
+      self.logger.info(`Detected touchscreen: ${touchscreenId || "none"}`);
+
+      let matrix = "1 0 0  0 1 0  0 0 1";
+      switch (touchcorrection) {
+         case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
+         case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
+         case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
       }
 
-      // Replace both variables independently
-      let conf1 = data.replace("${rotatescreen}", rotatescreen);
-      conf1 = conf1.replace("${touchcorrection}", touchcorrection);
-      conf1 = conf1.replace("${hidecursor}", phidecursor);
-      conf1 = conf1.replace("${display}", display);
+      exec(`DISPLAY=${display} xrandr --output DSI-1 --rotate ${rotatescreen}`);
+      if (touchscreenId) {
+         exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
+      }
+      exec(`DISPLAY=${display} ${phidecursor}`);
 
-
-      const scriptPath = "/data/plugins/user_interface/vkiosksettings/rotatescreen.sh";
-
-      fs.writeFile(scriptPath, conf1, { encoding: "utf8", mode: 0o755 }, function (err) {
-         if (err) {
-            self.logger.error("Script write error: " + err);
-            defer.reject(new Error(err));
-         } else {
-            self.logger.info(`Rotation script updated: display=${rotatescreen}, touchscreen=${touchcorrection}`);
-            self.restartvkiosksettingsservice();
-            defer.resolve();
-         }
-      });
-   });
-   return defer.promise;
+      return; // success
+   } catch (err) {
+      self.logger.error("applyscreensettings error: " + err);
+      throw err;
+   }
 };
