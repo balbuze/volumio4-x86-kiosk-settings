@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Set your screen and keyboard",
   "main": "index.js",
   "scripts": {

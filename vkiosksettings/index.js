@@ -257,23 +257,53 @@ vkiosksettings.prototype.getDisplaynumber = function () {
    }
 };
 
+vkiosksettings.prototype.detectConnectedScreen = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+
+   return new Promise((resolve, reject) => {
+      exec(`xrandr --display ${display} --query`, (error, stdout, stderr) => {
+         if (error) {
+            return reject(`xrandr error: ${stderr || error.message}`);
+         }
+
+         const lines = stdout.split("\n");
+
+         const connected = lines
+            .map(line => {
+               const match = line.match(/^([A-Za-z0-9-]+)\s+connected/);
+               return match ? match[1] : null;
+            })
+            .filter(Boolean);
+
+         if (connected.length === 0) {
+            self.logger.warn(logPrefix + " No connected screens detected");
+            return resolve(null);
+         }
+
+         self.logger.info(logPrefix + " Connected screens: " + connected.join(", "));
+         resolve(connected[0]);
+      });
+   });
+};
+
 vkiosksettings.prototype.fixXauthority = function () {
-  const self = this;
+   const self = this;
 
-  return new Promise((resolve, reject) => {
-    const cmd = `if [ -f /root/.Xauthority ]; then cp /root/.Xauthority /home/volumio/ && chown volumio:volumio /home/volumio/.Xauthority; fi`;
+   return new Promise((resolve, reject) => {
+      const cmd = `if [ -f /root/.Xauthority ]; then cp /root/.Xauthority /home/volumio/ && chown volumio:volumio /home/volumio/.Xauthority; fi`;
 
-    const fullCmd = `/bin/echo volumio | /usr/bin/sudo -S /bin/bash -c '${cmd}'`;
+      const fullCmd = `/bin/echo volumio | /usr/bin/sudo -S /bin/bash -c '${cmd}'`;
 
-    exec(fullCmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-      if (error) {
-        self.logger.error("fixXauthority failed: " + (stderr || error.message));
-        return reject(error);
-      }
-      self.logger.info("fixXauthority: /home/volumio/.Xauthority updated");
-      resolve(stdout);
-    });
-  });
+      exec(fullCmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+         if (error) {
+            self.logger.error(logPrefix + " fixXauthority failed: " + (stderr || error.message));
+            return reject(error);
+         }
+         self.logger.info(logPrefix + " fixXauthority: /home/volumio/.Xauthority updated");
+         resolve(stdout);
+      });
+   });
 };
 
 
@@ -301,7 +331,7 @@ vkiosksettings.prototype.wakeupScreen = function () {
    const defer = libQ.defer();
 
    const display = self.getDisplaynumber();
-   const cmd = `/bin/sudo /usr/bin/xset -display ${display} -dpms`;
+   const cmd = `/usr/bin/xset -display ${display} -dpms`;
 
    exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
       if (error) {
@@ -322,7 +352,7 @@ vkiosksettings.prototype.sleepScreen = function () {
    const display = self.getDisplaynumber();
    const timeout = self.config.get('timeout');
 
-   const cmd = `/bin/sudo /usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`;
+   const cmd = `/usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`;
 
    exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
       if (error) {
@@ -425,7 +455,7 @@ vkiosksettings.prototype.detectTouchscreen = function () {
             return { id, name };
          });
 
-         self.logger.info("Touchscreens detected: " + JSON.stringify(devices));
+         self.logger.info(logPrefix + " Touchscreens detected: " + JSON.stringify(devices));
          resolve(devices[0].id || devices[0].name);
       });
    });
@@ -440,13 +470,21 @@ vkiosksettings.prototype.applyscreensettings = async function () {
    const hidecursor = self.config.get("hidecursor");
 
    const phidecursor = hidecursor
-      ? "unclutter-xfixes -idle 2 -root"
+      ? "unclutter-xfixes -idle 3 -root"
       : "pkill unclutter";
 
    try {
+      // ✅ Detect touchscreen
       const touchscreenId = await self.detectTouchscreen();
-      self.logger.info(`Detected touchscreen: ${touchscreenId || "none"}`);
+      self.logger.info(logPrefix + ` Detected touchscreen: ${touchscreenId || "none"}`);
 
+      // ✅ Detect connected screen
+      const screen = await self.detectConnectedScreen();
+      if (!screen) {
+         self.logger.error(logPrefix + " No connected screen detected, skipping rotation.");
+      }
+
+      // Build touch matrix
       let matrix = "1 0 0  0 1 0  0 0 1";
       switch (touchcorrection) {
          case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
@@ -454,15 +492,22 @@ vkiosksettings.prototype.applyscreensettings = async function () {
          case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
       }
 
-      exec(`DISPLAY=${display} xrandr --output DSI-1 --rotate ${rotatescreen}`);
+      // ✅ Apply rotation only if screen found
+      if (screen) {
+         exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${rotatescreen}`);
+      }
+
+      // ✅ Apply touchscreen correction
       if (touchscreenId) {
          exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
       }
+
+      // ✅ Hide cursor if requested
       exec(`DISPLAY=${display} ${phidecursor}`);
 
       return; // success
    } catch (err) {
-      self.logger.error("applyscreensettings error: " + err);
+      self.logger.error(logPrefix + " applyscreensettings error: " + err);
       throw err;
    }
 };
