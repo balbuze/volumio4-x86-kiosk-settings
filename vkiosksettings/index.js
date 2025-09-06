@@ -310,7 +310,7 @@ vkiosksettings.prototype.fixXauthority = function () {
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
 
-   // self.logger.info(logPrefix +' noifplay '+ noifplay);
+   self.logger.info(logPrefix +' noifplay ');
 
    self.socket.on('pushState', function (data) {
       var timeout = self.config.get('timeout');
@@ -319,7 +319,7 @@ vkiosksettings.prototype.checkIfPlay = function () {
 
       if ((data.status === "play") && (noifplay)) {
          self.wakeupScreen()
-      } else if ((((data.status === "pause") || (data.status === "stop")) && (timeout != 0)) || ((data.status === "play") && (!noifplay))) {
+      } else if (((data.status != "play") && (timeout != 0)) || ((data.status === "play") && (!noifplay))) {
          self.sleepScreen()
 
       }
@@ -365,7 +365,6 @@ vkiosksettings.prototype.sleepScreen = function () {
 
    return defer.promise;
 };
-
 vkiosksettings.prototype.savescreensettings = function (data) {
    const self = this;
 
@@ -381,7 +380,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
 
    self.config.set('hidecursor', data['hidecursor']);
 
-   // ✅ validate timeout
+   // validate timeout
    let timeout = parseInt(data['timeout'], 10);
    if (isNaN(timeout)) {
       timeout = 120;
@@ -410,7 +409,6 @@ vkiosksettings.prototype.savescreensettings = function (data) {
          self.commandRouter.pushToastMessage(
             'success',
             ' ✅ Screen settings applied'
-
          );
       }
       self.config.set('timeout', timeout);
@@ -421,10 +419,29 @@ vkiosksettings.prototype.savescreensettings = function (data) {
    if (timeout === 0) {
       self.wakeupScreen();
    }
+setTimeout(function () {
    self.refreshUI();
    self.checkIfPlay();
    self.applyscreensettings();
+
+   // ✅ Apply screensaver immediately
+   try {
+      const state = self.commandRouter.volumioGetState();
+      const timeout = self.config.get('timeout');
+      const noifplay = self.config.get('noifplay');
+
+      if ((state.status === "play") && noifplay) {
+         self.wakeupScreen();
+      } else if (((state.status !== "play") && (timeout != 0)) || ((state.status === "play") && (!noifplay))) {
+         self.sleepScreen();
+      }
+   } catch (err) {
+      self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
+   }
+}, 500);
+
 };
+
 
 vkiosksettings.prototype.detectTouchscreen = function () {
    const self = this;
