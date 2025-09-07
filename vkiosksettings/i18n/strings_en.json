@@ -1,5 +1,6 @@
 {
     "TITLE":"Kiosk Settings",
+    "DISPLAY_SETTINGS":"Display settings",
     "APPLY":"Apply",
     "DISPLAY_ROT":"Display Rotation",
     "DISPLAY_ROT_DOC":"Choose how you want to rotate the display.",

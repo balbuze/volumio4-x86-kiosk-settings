@@ -6,8 +6,8 @@
     {
       "id": "kiosk",
       "element": "section",
-      "label": "Rotation",
-      "icon": "fa-plug",
+      "label": "TRANSLATE.DISPLAY_SETTINGS",
+      "icon": "fa-gears",
       "onSave": {
         "type": "controller",
         "endpoint": "user_interface/vkiosksettings",
