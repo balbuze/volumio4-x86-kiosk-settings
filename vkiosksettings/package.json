@@ -12,7 +12,7 @@
   "volumio_info": {
     "prettyName": "Kiosk-settings",
     "plugin_type": "user_interface",
-    "icon": "fa-info-circle",
+    "icon": "fa-desktop",
     "architectures": [
       "amd64"
     ],
