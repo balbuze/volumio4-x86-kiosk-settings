@@ -18,5 +18,8 @@
   "SCREENSAVER": "Activar protector de pantalla en (s)",
   "SCREENSAVER_DOC": "Configura el tiempo de espera en segundos antes del protector de pantalla. 0 = sin protector.",
   "NO_SS_IF_PLAY": "Desactivar protector al reproducir",
-  "NO_SS_IF_PLAY_DOC": "Desactiva el protector de pantalla durante la reproducción. El tiempo se aplica después de detener."
+  "NO_SS_IF_PLAY_DOC": "Desactiva el protector de pantalla durante la reproducción. El tiempo se aplica después de detener.",
+  "XSTYPE": "Tipo de protector de pantalla",
+  "XSTYPE_DOC": "Elige el tipo de protector de pantalla",
+  "XSCREEN_SAVER_SETTING": "Configuración de Xscreensaver"
 }

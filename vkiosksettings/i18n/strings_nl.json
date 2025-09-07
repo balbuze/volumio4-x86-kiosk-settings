@@ -18,5 +18,8 @@
   "SCREENSAVER": "Schermbeveiliging inschakelen na (s)",
   "SCREENSAVER_DOC": "Stel de tijd in seconden in voordat de schermbeveiliging wordt geactiveerd. 0 = geen schermbeveiliging.",
   "NO_SS_IF_PLAY": "Schermbeveiliging uitschakelen tijdens afspelen",
-  "NO_SS_IF_PLAY_DOC": "Schakelt de schermbeveiliging uit tijdens het afspelen. De tijd gaat lopen na het stoppen."
+  "NO_SS_IF_PLAY_DOC": "Schakelt de schermbeveiliging uit tijdens het afspelen. De tijd gaat lopen na het stoppen.",
+  "XSTYPE": "Type schermbeveiliging",
+  "XSTYPE_DOC": "Kies het type schermbeveiliging",
+  "XSCREEN_SAVER_SETTING": "Xscreensaver-instellingen"
 }

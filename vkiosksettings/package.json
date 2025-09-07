@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Set your screen and keyboard",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Kiosk settings",
-    "changelog": "",
+    "changelog": "xscreensaver",
     "manually_installed": true
   },
   "engines": {

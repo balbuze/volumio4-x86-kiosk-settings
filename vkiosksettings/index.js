@@ -86,60 +86,6 @@ vkiosksettings.prototype.onUninstall = function () {
    var self = this;
 };
 
-
-vkiosksettings.prototype.startvkiosksettingsservice = function () {
-   const self = this;
-   let defer = libQ.defer();
-
-   exec("/usr/bin/sudo /bin/systemctl start vkiosksettings.service", {
-      uid: 1000,
-      gid: 1000
-   }, function (error, stdout, stderr) {
-      if (error) {
-         self.logger.info(logPrefix + 'vkiosksettings failed to start. Check your configuration ' + error);
-      } else {
-         self.commandRouter.pushConsoleMessage('vkiosksettings Daemon Started');
-
-         defer.resolve();
-      }
-   });
-};
-
-vkiosksettings.prototype.restartvkiosksettingsservice = function () {
-   const self = this;
-   let defer = libQ.defer();
-   exec("/usr/bin/sudo /bin/systemctl restart vkiosksettings.service", {
-      uid: 1000,
-      gid: 1000
-   }, function (error, stdout, stderr) {
-      if (error) {
-         self.logger.info(logPrefix + 'vkiosksettings failed to start. Check your configuration ' + error);
-      } else {
-         self.commandRouter.pushConsoleMessage('vkiosksettings Daemon Started');
-
-         defer.resolve();
-      }
-   });
-};
-
-vkiosksettings.prototype.stopvkiosksettingsservice = function () {
-   const self = this;
-   let defer = libQ.defer();
-
-   exec("/usr/bin/sudo /bin/systemctl stop vkiosksettings.service", {
-      uid: 1000,
-      gid: 1000
-   }, function (error, stdout, stderr) {
-      if (error) {
-         self.logger.info(logPrefix + 'vkiosksettings failed to stop!! ' + error);
-      } else {
-         self.commandRouter.pushConsoleMessage('vkiosksettings Daemon Stop');
-
-         defer.resolve();
-      }
-   });
-};
-
 vkiosksettings.prototype.getUIConfig = function () {
    var defer = libQ.defer();
    var self = this;
@@ -165,8 +111,8 @@ vkiosksettings.prototype.getUIConfig = function () {
          var hidecursor = self.config.get('hidecursor', false);
          uiconf.sections[0].content[2].value = hidecursor;
 
-         uiconf.sections[0].content[3].value = self.config.get('timeout');
-         uiconf.sections[0].content[3].attributes = [
+         uiconf.sections[0].content[5].value = self.config.get('timeout');
+         uiconf.sections[0].content[5].attributes = [
             {
                placeholder: 120,
                maxlength: 4,
@@ -174,8 +120,12 @@ vkiosksettings.prototype.getUIConfig = function () {
                max: 1000
             }
          ];
+         var xsvalue = self.config.get('screensavertype') || { value: "dpms", label: "dpms" };
 
-         uiconf.sections[0].content[4].value = self.config.get('noifplay');
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[3].value.value', xsvalue.value);
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[3].value.label', xsvalue.label);
+
+         uiconf.sections[0].content[6].value = self.config.get('noifplay');
 
          defer.resolve(uiconf);
       })
@@ -306,11 +256,12 @@ vkiosksettings.prototype.fixXauthority = function () {
    });
 };
 
-
+/*
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
 
-   self.logger.info(logPrefix +' noifplay ');
+   self.logger.info(logPrefix + ' noifplay ');
+
 
    self.socket.on('pushState', function (data) {
       var timeout = self.config.get('timeout');
@@ -325,22 +276,83 @@ vkiosksettings.prototype.checkIfPlay = function () {
       }
    })
 };
+*/
+vkiosksettings.prototype.checkIfPlay = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+
+   self.logger.info(logPrefix + " Preparing playback state watcher...");
+
+   // 🔴 Disable DPMS immediately
+   exec(`/usr/bin/xset -display ${display} -dpms`, (error) => {
+      if (error) {
+         self.logger.error(logPrefix + " Failed to disable DPMS: " + error);
+      } else {
+         self.logger.info(logPrefix + " DPMS disabled before playback state check");
+      }
+   });
+
+   // 🔴 Kill any running xscreensaver instance
+   exec("pkill -9 xscreensaver || true", (error) => {
+      if (error) {
+         self.logger.warn(logPrefix + " No xscreensaver to kill (probably fine)");
+      } else {
+         self.logger.info(logPrefix + " xscreensaver stopped");
+      }
+   });
+
+   // 🎵 Now listen for Volumio state changes
+   self.socket.on("pushState", function (data) {
+      const timeout = self.config.get("timeout");
+      const noifplay = self.config.get("noifplay");
+
+      self.logger.info(
+         `${logPrefix} Volumio status=${data.status} timeout=${timeout} noifplay=${noifplay}`
+      );
+
+      if (data.status === "play" && noifplay) {
+         self.wakeupScreen();
+      } else if (
+         (data.status !== "play" && timeout !== 0) ||
+         (data.status === "play" && !noifplay)
+      ) {
+         self.sleepScreen();
+      }
+   });
+};
+
 
 vkiosksettings.prototype.wakeupScreen = function () {
    const self = this;
    const defer = libQ.defer();
-
+   const screensavertype = self.config.get('screensavertype').value;
    const display = self.getDisplaynumber();
-   const cmd = `/usr/bin/xset -display ${display} -dpms`;
 
-   exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-      if (error) {
-         self.logger.error(logPrefix + ': Error waking up the screen: ' + error);
-      } else {
-         self.logger.info(logPrefix + `: Screen wake command sent to display=${display}`);
-      }
-      defer.resolve();
-   });
+   if (screensavertype === 'dpms') {
+      // 🔵 Wake screen via DPMS
+      const cmd = `/usr/bin/xset -display ${display} -dpms`;
+      exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+         if (error) {
+            self.logger.error(logPrefix + ': Error waking up the screen: ' + error);
+         } else {
+            self.logger.info(logPrefix + `: Screen wake command sent to display=${display}`);
+         }
+         defer.resolve();
+      });
+   } else {
+      // 🟢 Restart xscreensaver (reactivate)
+      exec(`DISPLAY=${display} xscreensaver -no-splash &`, (error) => {
+         if (error) self.logger.error(logPrefix + " Error starting xscreensaver: " + error);
+      });
+      exec(`DISPLAY=${display} xscreensaver-command -restart`, (error) => {
+         if (error) {
+            self.logger.error(logPrefix + " Error enabling xscreensaver: " + error);
+         } else {
+            self.logger.info(logPrefix + " xscreensaver restarted on display=" + display);
+         }
+         defer.resolve();
+      });
+   }
 
    return defer.promise;
 };
@@ -348,6 +360,72 @@ vkiosksettings.prototype.wakeupScreen = function () {
 vkiosksettings.prototype.sleepScreen = function () {
    const self = this;
    const defer = libQ.defer();
+   const display = self.getDisplaynumber();
+   const timeout = self.config.get('timeout');
+   const screensavertype = self.config.get('screensavertype').value;
+
+   if (screensavertype === 'dpms') {
+      // 🔵 DPMS sleep with timeout
+      const cmd = `/usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`;
+      exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+         if (error) {
+            self.logger.error(logPrefix + ': Error sleeping the screen (DPMS): ' + error);
+         } else {
+            self.logger.info(logPrefix + `: Sleep screen set with timeout=${timeout}, display=${display}`);
+         }
+         defer.resolve();
+      });
+   } else {
+      // 🟢 Enable xscreensaver blanking after timeout
+      exec(`DISPLAY=${display} xscreensaver-command -exit`, (error) => {
+         if (error) self.logger.warn(logPrefix + " xscreensaver not running, starting it...");
+         exec(`DISPLAY=${display} xscreensaver -no-splash &`, () => { });
+      });
+
+      exec(`DISPLAY=${display} xscreensaver-command -activate`, (error) => {
+         if (error) {
+            self.logger.error(logPrefix + " Error activating xscreensaver: " + error);
+         } else {
+            self.logger.info(logPrefix + " xscreensaver activated on display=" + display);
+         }
+         defer.resolve();
+      });
+   }
+
+   return defer.promise;
+};
+
+
+// inside your plugin object
+vkiosksettings.prototype.xscreensettings = function () {
+   const self = this;
+   const defer = libQ.defer();
+
+   const display = self.getDisplaynumber();
+
+   // Kill any existing demo instance before starting a new one
+   exec(`pkill -f xscreensaver-demo || true`);
+
+   // Launch xscreensaver-demo on the correct display
+   const cmd = `DISPLAY=${display} xscreensaver-demo`;
+   exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+      if (error) {
+         self.logger.error(logPrefix + ": Failed to start xscreensaver-demo: " + error);
+         defer.reject(error);
+      } else {
+         self.logger.info(logPrefix + `: xscreensaver-demo started on display ${display}`);
+         defer.resolve();
+      }
+   });
+
+   return defer.promise;
+};
+
+/*
+vkiosksettings.prototype.sleepScreen = function () {
+   const self = this;
+   const defer = libQ.defer();
+   const screensavertype = self.config.get('screensavertype');
 
    const display = self.getDisplaynumber();
    const timeout = self.config.get('timeout');
@@ -365,6 +443,7 @@ vkiosksettings.prototype.sleepScreen = function () {
 
    return defer.promise;
 };
+*/
 vkiosksettings.prototype.savescreensettings = function (data) {
    const self = this;
 
@@ -413,32 +492,35 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       }
       self.config.set('timeout', timeout);
    }
-
+   self.config.set('screensavertype', {
+      value: data['screensavertype'].value,
+      label: data['screensavertype'].label
+   });
    self.config.set('noifplay', data.noifplay);
 
    if (timeout === 0) {
       self.wakeupScreen();
    }
-setTimeout(function () {
-   self.refreshUI();
-   self.checkIfPlay();
-   self.applyscreensettings();
+   setTimeout(function () {
+      self.refreshUI();
+      self.checkIfPlay();
+      self.applyscreensettings();
 
-   // ✅ Apply screensaver immediately
-   try {
-      const state = self.commandRouter.volumioGetState();
-      const timeout = self.config.get('timeout');
-      const noifplay = self.config.get('noifplay');
+      // ✅ Apply screensaver immediately
+      try {
+         const state = self.commandRouter.volumioGetState();
+         const timeout = self.config.get('timeout');
+         const noifplay = self.config.get('noifplay');
 
-      if ((state.status === "play") && noifplay) {
-         self.wakeupScreen();
-      } else if (((state.status !== "play") && (timeout != 0)) || ((state.status === "play") && (!noifplay))) {
-         self.sleepScreen();
+         if ((state.status === "play") && noifplay) {
+            self.wakeupScreen();
+         } else if (((state.status !== "play") && (timeout != 0)) || ((state.status === "play") && (!noifplay))) {
+            self.sleepScreen();
+         }
+      } catch (err) {
+         self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   } catch (err) {
-      self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
-   }
-}, 500);
+   }, 500);
 
 };
 
@@ -486,10 +568,6 @@ vkiosksettings.prototype.applyscreensettings = async function () {
    const touchcorrection = self.config.get("touchcorrection").value;
    const hidecursor = self.config.get("hidecursor");
 
-   const phidecursor = hidecursor
-      ? "unclutter-xfixes -idle 3 -root"
-      : "pkill unclutter";
-
    try {
       // ✅ Detect touchscreen
       const touchscreenId = await self.detectTouchscreen();
@@ -519,8 +597,17 @@ vkiosksettings.prototype.applyscreensettings = async function () {
          exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
       }
 
-      // ✅ Hide cursor if requested
-      exec(`DISPLAY=${display} ${phidecursor}`);
+      // ✅ Handle cursor hiding
+      if (!hidecursor) {
+         exec(`echo volumio | sudo -S pkill -f unclutter`);
+         self.logger.info(logPrefix + ` unclutter stops`);
+      }
+      if (hidecursor) {
+         // Relaunch unclutter
+         exec(`DISPLAY=${display} echo volumio | sudo -S unclutter-xfixes -idle 3 -root`);
+         self.logger.info(logPrefix + ` unclutter starts`);
+
+      }
 
       return; // success
    } catch (err) {

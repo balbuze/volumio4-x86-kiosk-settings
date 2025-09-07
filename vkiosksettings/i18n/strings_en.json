@@ -18,6 +18,9 @@
     "SCREENSAVER":"Enable screen saver in (s)",
     "SCREENSAVER_DOC":"Set the timeout before screensaver in seconds. 0 = no screensaver.",
     "NO_SS_IF_PLAY":"Disable screensaver when playing",
-    "NO_SS_IF_PLAY_DOC":"Disable screensaver when playing. Timeout is aplied when stop plyaing."
+    "NO_SS_IF_PLAY_DOC":"Disable screensaver when playing. Timeout is aplied when stop plyaing.",
+    "XSTYPE":"Screensaver type",
+    "XSTYPE_DOC":"Choose screensaver type",
+    "XSCREEN_SAVER_SETTING":"Xscreensaver settings"
 
 }

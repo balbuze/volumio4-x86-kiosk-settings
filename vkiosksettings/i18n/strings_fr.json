@@ -18,5 +18,8 @@
   "SCREENSAVER": "Activer l’économiseur d’écran en (s)",
   "SCREENSAVER_DOC": "Définissez le délai avant l’activation de l’économiseur d’écran en secondes. 0 = aucun économiseur.",
   "NO_SS_IF_PLAY": "Désactiver l’économiseur lors de la lecture",
-  "NO_SS_IF_PLAY_DOC": "Désactive l’économiseur d’écran pendant la lecture. Le délai s’applique après l’arrêt."
+  "NO_SS_IF_PLAY_DOC": "Désactive l’économiseur d’écran pendant la lecture. Le délai s’applique après l’arrêt.",
+  "XSTYPE": "Type d’économiseur d’écran",
+  "XSTYPE_DOC": "Choisissez le type d’économiseur d’écran",
+  "XSCREEN_SAVER_SETTING": "Paramètres Xscreensaver"
 }

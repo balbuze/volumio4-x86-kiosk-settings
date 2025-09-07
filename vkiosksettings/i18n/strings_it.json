@@ -18,5 +18,8 @@
   "SCREENSAVER": "Abilita salvaschermo in (s)",
   "SCREENSAVER_DOC": "Imposta il tempo di attesa in secondi prima del salvaschermo. 0 = nessun salvaschermo.",
   "NO_SS_IF_PLAY": "Disattiva salvaschermo durante la riproduzione",
-  "NO_SS_IF_PLAY_DOC": "Disattiva il salvaschermo durante la riproduzione. Il timeout si applica dopo lo stop."
+  "NO_SS_IF_PLAY_DOC": "Disattiva il salvaschermo durante la riproduzione. Il timeout si applica dopo lo stop.",
+  "XSTYPE": "Tipo di salvaschermo",
+  "XSTYPE_DOC": "Scegli il tipo di salvaschermo",
+  "XSCREEN_SAVER_SETTING": "Impostazioni Xscreensaver"
 }

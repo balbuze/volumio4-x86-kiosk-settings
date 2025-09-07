@@ -20,7 +20,8 @@
           "touchcorrection",
           "hidecursor",
           "timeout",
-          "noifplay"
+          "noifplay",
+          "screensavertype"
         ]
       },
       "content": [
@@ -85,16 +86,49 @@
           "element": "switch",
           "label": "TRANSLATE.MOUSE_C",
           "doc": "TRANSLATE.MOUSE_C_DOC",
-
           "value": false
+        },
+        {
+          "id": "screensavertype",
+          "element": "select",
+          "doc": "TRANSLATE.XSTYPE_DOC",
+          "label": "TRANSLATE.XSTYPE",
+          "value": {
+            "value": "",
+            "label": ""
+          },
+          "options": [
+            {
+              "value": "dpms",
+              "label": "dpms"
+            },
+            {
+              "value": "xscreensaver",
+              "label": "xscreensaver"
+            }
+          ]
+        },
+        {
+          "id": "xscreensettings",
+          "element": "button",
+          "label": "TRANSLATE.XSCREEN_SAVER_SETTING",
+          "onClick": {
+            "type": "plugin",
+            "endpoint": "user_interface/vkiosksettings",
+            "method": "xscreensettings"
+          },
+          "visibleIf": {
+            "field": "screensavertype",
+            "value": "xscreensaver"
+          }
         },
         {
           "id": "timeout",
           "element": "input",
-          "type":"number",
+          "type": "number",
           "doc": "Set the duration before screensaver in seconds. 0 = no screensaver ",
           "label": "TRANSLATE.SCREENSAVER",
-            "attributes": [
+          "attributes": [
             {
               "placeholder": {}
             },
@@ -108,13 +142,17 @@
               "max": 3600
             }
           ],
-          "value": 120
+          "value": 120,
+          "visibleIf": {
+            "field": "screensavertype",
+            "value": "dpms"
+          }
         },
-         {
+        {
           "id": "noifplay",
           "element": "switch",
           "label": "TRANSLATE.NO_SS_IF_PLAY",
-          "doc":"TRANSLATE.NO_SS_IF_PLAY_DOC",
+          "doc": "TRANSLATE.NO_SS_IF_PLAY_DOC",
           "value": true
         }
       ]

@@ -18,5 +18,8 @@
   "SCREENSAVER": "Bildschirmschoner aktivieren nach (s)",
   "SCREENSAVER_DOC": "Legen Sie die Zeit in Sekunden fest, bevor der Bildschirmschoner aktiviert wird. 0 = kein Bildschirmschoner.",
   "NO_SS_IF_PLAY": "Bildschirmschoner bei Wiedergabe deaktivieren",
-  "NO_SS_IF_PLAY_DOC": "Deaktiviert den Bildschirmschoner während der Wiedergabe. Der Timeout gilt nach dem Stopp."
+  "NO_SS_IF_PLAY_DOC": "Deaktiviert den Bildschirmschoner während der Wiedergabe. Der Timeout gilt nach dem Stopp.",
+  "XSTYPE": "Bildschirmschonertyp",
+  "XSTYPE_DOC": "Wählen Sie den Bildschirmschonertyp",
+  "XSCREEN_SAVER_SETTING": "Xscreensaver-Einstellungen"
 }
