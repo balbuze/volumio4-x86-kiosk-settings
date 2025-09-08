@@ -13,21 +13,15 @@ const logPrefix = "vkiosksettings --- "
 // Define the vkiosksettings class
 module.exports = vkiosksettings;
 
-
-
 function vkiosksettings(context) {
    var self = this;
-
    self.context = context;
    self.commandRouter = self.context.coreCommand;
    self.logger = self.commandRouter.logger;
-
-
    this.context = context;
    this.commandRouter = this.context.coreCommand;
    this.logger = this.context.logger;
    this.configManager = this.context.configManager;
-
 };
 
 vkiosksettings.prototype.onVolumioStart = function () {
@@ -35,10 +29,7 @@ vkiosksettings.prototype.onVolumioStart = function () {
    var configFile = this.commandRouter.pluginManager.getConfigurationFile(this.context, 'config.json');
    this.config = new (require('v-conf'))();
    this.config.loadFile(configFile);
-
    return libQ.resolve();
-
-
 };
 
 vkiosksettings.prototype.getConfigurationFiles = function () {
@@ -95,13 +86,17 @@ vkiosksettings.prototype.getUIConfig = function () {
    self.commandRouter.i18nJson(__dirname + '/i18n/strings_' + lang_code + '.json',
       __dirname + '/i18n/strings_en.json',
       __dirname + '/UIConfig.json')
-      .then(function (uiconf) {
+      .then(async function (uiconf) {
 
          var rvalue = self.config.get('rotatescreen') || { value: "normal", label: "normal" };
 
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].value.value', rvalue.value);
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].value.label', rvalue.label);
 
+         let touchscreenId = await self.detectTouchscreen();
+         if (!touchscreenId || touchscreenId === 'none') {
+            uiconf.sections[0].content[1].hidden = true;
+         }
 
          var tcvalue = self.config.get('touchcorrection') || { value: "none", label: "none" };
 
@@ -256,34 +251,13 @@ vkiosksettings.prototype.fixXauthority = function () {
    });
 };
 
-/*
-vkiosksettings.prototype.checkIfPlay = function () {
-   const self = this;
-
-   self.logger.info(logPrefix + ' noifplay ');
-
-
-   self.socket.on('pushState', function (data) {
-      var timeout = self.config.get('timeout');
-      var noifplay = self.config.get('noifplay');
-      self.logger.info(logPrefix + 'Volumio status ' + data.status + ' timeout ' + timeout + ' noifplay ' + noifplay);
-
-      if ((data.status === "play") && (noifplay)) {
-         self.wakeupScreen()
-      } else if (((data.status != "play") && (timeout != 0)) || ((data.status === "play") && (!noifplay))) {
-         self.sleepScreen()
-
-      }
-   })
-};
-*/
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
    const display = self.getDisplaynumber();
 
-   self.logger.info(logPrefix + " Preparing playback state watcher...");
+   //self.logger.info(logPrefix + " Preparing playback state watcher...");
 
-   // 🔴 Disable DPMS immediately
+   //  Disable DPMS immediately
    exec(`/usr/bin/xset -display ${display} -dpms`, (error) => {
       if (error) {
          self.logger.error(logPrefix + " Failed to disable DPMS: " + error);
@@ -292,7 +266,7 @@ vkiosksettings.prototype.checkIfPlay = function () {
       }
    });
 
-   // 🔴 Kill any running xscreensaver instance
+   //  Kill any running xscreensaver instance
    exec("pkill -9 xscreensaver || true", (error) => {
       if (error) {
          self.logger.warn(logPrefix + " No xscreensaver to kill (probably fine)");
@@ -301,24 +275,39 @@ vkiosksettings.prototype.checkIfPlay = function () {
       }
    });
 
-   // 🎵 Now listen for Volumio state changes
-   self.socket.on("pushState", function (data) {
-      const timeout = self.config.get("timeout");
-      const noifplay = self.config.get("noifplay");
+  self.socket.on("pushState", function (data) {
+   const timeout = self.config.get("timeout");
+   const noifplay = self.config.get("noifplay");
+   const screensavertype = self.config.get("screensavertype").value;
 
-      self.logger.info(
-         `${logPrefix} Volumio status=${data.status} timeout=${timeout} noifplay=${noifplay}`
-      );
+   self.logger.info(
+      `${logPrefix} Volumio status=${data.status} timeout=${timeout} noifplay=${noifplay} screensavertype=${screensavertype}`
+   );
 
-      if (data.status === "play" && noifplay) {
-         self.wakeupScreen();
-      } else if (
-         (data.status !== "play" && timeout !== 0) ||
-         (data.status === "play" && !noifplay)
-      ) {
-         self.sleepScreen();
-      }
-   });
+   // ---- Wake conditions ----
+   if ((data.status === "play" && noifplay) || timeout === 0) {
+      self.wakeupScreen();
+      self.logger.info(`${logPrefix} → Wakeup triggered`);
+      return;
+   }
+
+   // ---- Sleep (DPMS) ----
+   if (data.status !== "play" && timeout !== 0 && screensavertype === "dpms") {
+      self.sleepScreen();
+      self.logger.info(`${logPrefix} → Sleep (DPMS) triggered`);
+      return;
+   }
+
+   // ---- Sleep (xscreensaver) ----
+   if (data.status !== "play" && screensavertype === "xscreensaver") {
+      self.sleepScreen();
+      self.logger.info(`${logPrefix} → Sleep (xscreensaver) triggered`);
+      return;
+   }
+
+   self.logger.info(`${logPrefix} → No action taken`);
+});
+
 };
 
 
@@ -341,12 +330,14 @@ vkiosksettings.prototype.wakeupScreen = function () {
       });
    } else {
       // 🟢 Restart xscreensaver (reactivate)
-      exec(`DISPLAY=${display} xscreensaver -no-splash &`, (error) => {
+      /*
+      exec(`DISPLAY=${display} xscreensaver`, (error) => {
          if (error) self.logger.error(logPrefix + " Error starting xscreensaver: " + error);
       });
-      exec(`DISPLAY=${display} xscreensaver-command -restart`, (error) => {
+      */
+      exec(`pkill -f xscreensaver`, (error) => {
          if (error) {
-            self.logger.error(logPrefix + " Error enabling xscreensaver: " + error);
+            self.logger.error(logPrefix + " Error disabling xscreensaver: " + error);
          } else {
             self.logger.info(logPrefix + " xscreensaver restarted on display=" + display);
          }
@@ -377,12 +368,13 @@ vkiosksettings.prototype.sleepScreen = function () {
       });
    } else {
       // 🟢 Enable xscreensaver blanking after timeout
+      /*
       exec(`DISPLAY=${display} xscreensaver-command -exit`, (error) => {
          if (error) self.logger.warn(logPrefix + " xscreensaver not running, starting it...");
-         exec(`DISPLAY=${display} xscreensaver -no-splash &`, () => { });
+         exec(`DISPLAY=${display} xscreensaver`, () => { });
       });
-
-      exec(`DISPLAY=${display} xscreensaver-command -activate`, (error) => {
+*/
+      exec(`DISPLAY=${display} xscreensaver`, (error) => {
          if (error) {
             self.logger.error(logPrefix + " Error activating xscreensaver: " + error);
          } else {
@@ -421,29 +413,6 @@ vkiosksettings.prototype.xscreensettings = function () {
    return defer.promise;
 };
 
-/*
-vkiosksettings.prototype.sleepScreen = function () {
-   const self = this;
-   const defer = libQ.defer();
-   const screensavertype = self.config.get('screensavertype');
-
-   const display = self.getDisplaynumber();
-   const timeout = self.config.get('timeout');
-
-   const cmd = `/usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`;
-
-   exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-      if (error) {
-         self.logger.error(logPrefix + ': Error sleeping the screen: ' + error);
-      } else {
-         self.logger.info(logPrefix + `: Sleep screen set with timeout=${timeout}, display=${display}`);
-      }
-      defer.resolve();
-   });
-
-   return defer.promise;
-};
-*/
 vkiosksettings.prototype.savescreensettings = function (data) {
    const self = this;
 
@@ -560,26 +529,39 @@ vkiosksettings.prototype.detectTouchscreen = function () {
    });
 };
 
-vkiosksettings.prototype.applyscreensettings = async function () {
+// 1. Rotate screen
+vkiosksettings.prototype.applyRotation = async function () {
    const self = this;
    const display = self.getDisplaynumber();
-
    const rotatescreen = self.config.get("rotatescreen").value;
-   const touchcorrection = self.config.get("touchcorrection").value;
-   const hidecursor = self.config.get("hidecursor");
 
    try {
-      // ✅ Detect touchscreen
-      const touchscreenId = await self.detectTouchscreen();
-      self.logger.info(logPrefix + ` Detected touchscreen: ${touchscreenId || "none"}`);
-
-      // ✅ Detect connected screen
       const screen = await self.detectConnectedScreen();
       if (!screen) {
          self.logger.error(logPrefix + " No connected screen detected, skipping rotation.");
+         return;
+      }
+      exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${rotatescreen}`);
+      self.logger.info(logPrefix + ` Rotation applied: ${rotatescreen}`);
+   } catch (err) {
+      self.logger.error(logPrefix + " applyRotation error: " + err);
+   }
+};
+
+
+// 2. Apply touchscreen correction
+vkiosksettings.prototype.applyTouchCorrection = async function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+   const touchcorrection = self.config.get("touchcorrection").value;
+
+   try {
+      const touchscreenId = await self.detectTouchscreen();
+      if (!touchscreenId || touchscreenId === "none") {
+         self.logger.info(logPrefix + " No touchscreen detected, skipping correction.");
+         return;
       }
 
-      // Build touch matrix
       let matrix = "1 0 0  0 1 0  0 0 1";
       switch (touchcorrection) {
          case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
@@ -587,31 +569,35 @@ vkiosksettings.prototype.applyscreensettings = async function () {
          case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
       }
 
-      // ✅ Apply rotation only if screen found
-      if (screen) {
-         exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${rotatescreen}`);
-      }
-
-      // ✅ Apply touchscreen correction
-      if (touchscreenId) {
-         exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
-      }
-
-      // ✅ Handle cursor hiding
-      if (!hidecursor) {
-         exec(`echo volumio | sudo -S pkill -f unclutter`);
-         self.logger.info(logPrefix + ` unclutter stops`);
-      }
-      if (hidecursor) {
-         // Relaunch unclutter
-         exec(`DISPLAY=${display} echo volumio | sudo -S unclutter-xfixes -idle 3 -root`);
-         self.logger.info(logPrefix + ` unclutter starts`);
-
-      }
-
-      return; // success
+      exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
+      self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection}`);
    } catch (err) {
-      self.logger.error(logPrefix + " applyscreensettings error: " + err);
-      throw err;
+      self.logger.error(logPrefix + " applyTouchCorrection error: " + err);
    }
+};
+
+
+// 3. Handle cursor hiding
+vkiosksettings.prototype.applyCursorSetting = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+   const hidecursor = self.config.get("hidecursor");
+
+   try {
+      exec("pkill -f unclutter");  // always stop first
+      if (hidecursor) {
+         exec(`DISPLAY=${display} unclutter-xfixes -idle 3 -root &`);
+         self.logger.info(logPrefix + " unclutter started");
+      } else {
+         self.logger.info(logPrefix + " unclutter stopped");
+      }
+   } catch (err) {
+      self.logger.error(logPrefix + " applyCursorSetting error: " + err);
+   }
+};
+
+vkiosksettings.prototype.applyscreensettings = async function () {
+   await this.applyRotation();
+   await this.applyTouchCorrection();
+   this.applyCursorSetting();
 };

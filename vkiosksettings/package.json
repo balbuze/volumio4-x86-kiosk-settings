@@ -1,7 +1,7 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.4",
-  "description": "Set your screen and keyboard",
+  "version": "0.0.5",
+  "description": "Set your display for the Kiosk",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Kiosk settings",
-    "changelog": "xscreensaver",
+    "changelog": "split functions",
     "manually_installed": true
   },
   "engines": {
