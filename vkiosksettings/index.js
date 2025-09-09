@@ -251,154 +251,135 @@ vkiosksettings.prototype.fixXauthority = function () {
    });
 };
 
+vkiosksettings.prototype.ensureXscreensaver = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+
+   exec("pgrep xscreensaver", (err, stdout) => {
+      if (stdout && stdout.trim().length > 0) {
+         self.logger.info(logPrefix + " xscreensaver already running (pid " + stdout.trim() + ")");
+      } else {
+         exec(`DISPLAY=${display} xscreensaver -nosplash &`);
+         self.logger.info(logPrefix + " xscreensaver started (using ~/.xscreensaver settings)");
+      }
+   });
+};
+
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
    const display = self.getDisplaynumber();
 
-   //self.logger.info(logPrefix + " Preparing playback state watcher...");
-
-   //  Disable DPMS immediately
-   exec(`/usr/bin/xset -display ${display} -dpms`, (error) => {
-      if (error) {
-         self.logger.error(logPrefix + " Failed to disable DPMS: " + error);
-      } else {
-         self.logger.info(logPrefix + " DPMS disabled before playback state check");
-      }
+   // Disable DPMS at start
+   exec(`/usr/bin/xset -display ${display} -dpms`, () => {
+      self.logger.info(logPrefix + " DPMS disabled before playback state check");
    });
 
-   //  Kill any running xscreensaver instance
-   exec("pkill -9 xscreensaver || true", (error) => {
-      if (error) {
-         self.logger.warn(logPrefix + " No xscreensaver to kill (probably fine)");
-      } else {
-         self.logger.info(logPrefix + " xscreensaver stopped");
-      }
+   // Kill any leftover xscreensaver instances (clean start)
+   exec("pkill -9 xscreensaver || true", () => {
+      self.logger.info(logPrefix + " xscreensaver cleaned up before starting");
    });
 
-  self.socket.on("pushState", function (data) {
-   const timeout = self.config.get("timeout");
-   const noifplay = self.config.get("noifplay");
+   // 🔹 Start xscreensaver immediately if selected
    const screensavertype = self.config.get("screensavertype").value;
-
-   self.logger.info(
-      `${logPrefix} Volumio status=${data.status} timeout=${timeout} noifplay=${noifplay} screensavertype=${screensavertype}`
-   );
-
-   // ---- Wake conditions ----
-   if ((data.status === "play" && noifplay) || timeout === 0) {
-      self.wakeupScreen();
-      self.logger.info(`${logPrefix} → Wakeup triggered`);
-      return;
+   if (screensavertype === "xscreensaver") {
+      self.ensureXscreensaver();
    }
 
-   // ---- Sleep (DPMS) ----
-   if (data.status !== "play" && timeout !== 0 && screensavertype === "dpms") {
-      self.sleepScreen();
-      self.logger.info(`${logPrefix} → Sleep (DPMS) triggered`);
-      return;
+   // 🎵 Listen for Volumio playback state
+   self.socket.on("pushState", function (data) {
+      const timeout = self.config.get("timeout") || 0;
+      const noifplay = self.config.get("noifplay");
+      const screensavertype = self.config.get("screensavertype").value;
+
+      self.logger.info(
+         `${logPrefix} Volumio status=${data.status} timeout=${timeout} noifplay=${noifplay} screensavertype=${screensavertype}`
+      );
+
+      // ---- Wake conditions ----
+      if ((data.status === "play" && noifplay) || timeout === 0) {
+         self.wakeupScreen();
+         self.logger.info(`${logPrefix} → Wakeup triggered`);
+         return;
+      }
+
+      // ---- Sleep (DPMS) ----
+      if (data.status !== "play" && timeout !== 0 && screensavertype === "dpms") {
+         setTimeout(() => {
+            if (self.lastState !== "play") {
+               self.sleepScreen();
+               self.logger.info(`${logPrefix} → Sleep (DPMS) triggered after ${timeout}s`);
+            }
+         }, timeout * 1000);
+         return;
+      }
+
+      // ---- Sleep (xscreensaver) ----
+      if (data.status !== "play" && screensavertype === "xscreensaver") {
+         self.sleepScreen();
+         self.logger.info(`${logPrefix} → Sleep (xscreensaver) triggered`);
+         return;
+      }
+
+      self.logger.info(`${logPrefix} → No action taken`);
+   });
+};
+
+
+vkiosksettings.prototype.sleepScreen = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+   const screensavertype = self.config.get("screensavertype").value;
+   const timeout = self.config.get('timeout');
+
+   try {
+      if (screensavertype === "dpms") {
+         // Use DPMS to force screen off
+         exec(`/usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`);
+         self.logger.info(logPrefix + " sleepScreen: DPMS → screen");
+      } else if (screensavertype === "xscreensaver") {
+         // Use xscreensaver to blank/activate
+         exec(`DISPLAY=${display} xscreensaver-command -activate`);
+         self.logger.info(logPrefix + " sleepScreen: xscreensaver → activate");
+      } else {
+         self.logger.warn(logPrefix + " sleepScreen: Unknown screensaver type, doing nothing");
+      }
+   } catch (err) {
+      self.logger.error(logPrefix + " sleepScreen error: " + err);
    }
-
-   // ---- Sleep (xscreensaver) ----
-   if (data.status !== "play" && screensavertype === "xscreensaver") {
-      self.sleepScreen();
-      self.logger.info(`${logPrefix} → Sleep (xscreensaver) triggered`);
-      return;
-   }
-
-   self.logger.info(`${logPrefix} → No action taken`);
-});
-
 };
 
 
 vkiosksettings.prototype.wakeupScreen = function () {
    const self = this;
-   const defer = libQ.defer();
-   const screensavertype = self.config.get('screensavertype').value;
    const display = self.getDisplaynumber();
+   const screensavertype = self.config.get("screensavertype").value;
 
-   if (screensavertype === 'dpms') {
-      // 🔵 Wake screen via DPMS
-      const cmd = `/usr/bin/xset -display ${display} -dpms`;
-      exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-         if (error) {
-            self.logger.error(logPrefix + ': Error waking up the screen: ' + error);
-         } else {
-            self.logger.info(logPrefix + `: Screen wake command sent to display=${display}`);
-         }
-         defer.resolve();
-      });
-   } else {
-      // 🟢 Restart xscreensaver (reactivate)
-      /*
-      exec(`DISPLAY=${display} xscreensaver`, (error) => {
-         if (error) self.logger.error(logPrefix + " Error starting xscreensaver: " + error);
-      });
-      */
-      exec(`pkill -f xscreensaver`, (error) => {
-         if (error) {
-            self.logger.error(logPrefix + " Error disabling xscreensaver: " + error);
-         } else {
-            self.logger.info(logPrefix + " xscreensaver restarted on display=" + display);
-         }
-         defer.resolve();
-      });
+   try {
+      if (screensavertype === "dpms") {
+         // Wake DPMS screen
+         exec(`/usr/bin/xset -display ${display} dpms force on`);
+         self.logger.info(logPrefix + " wakeupScreen: DPMS → screen on");
+      } else if (screensavertype === "xscreensaver") {
+         // Disable xscreensaver blanking
+         exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
+         self.logger.info(logPrefix + " wakeupScreen: xscreensaver → deactivate");
+      } else {
+         self.logger.warn(logPrefix + " wakeupScreen: Unknown screensaver type, doing nothing");
+      }
+   } catch (err) {
+      self.logger.error(logPrefix + " wakeupScreen error: " + err);
    }
-
-   return defer.promise;
 };
 
-vkiosksettings.prototype.sleepScreen = function () {
-   const self = this;
-   const defer = libQ.defer();
-   const display = self.getDisplaynumber();
-   const timeout = self.config.get('timeout');
-   const screensavertype = self.config.get('screensavertype').value;
-
-   if (screensavertype === 'dpms') {
-      // 🔵 DPMS sleep with timeout
-      const cmd = `/usr/bin/xset -display ${display} s 0 0 +dpms dpms 0 0 ${timeout}`;
-      exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-         if (error) {
-            self.logger.error(logPrefix + ': Error sleeping the screen (DPMS): ' + error);
-         } else {
-            self.logger.info(logPrefix + `: Sleep screen set with timeout=${timeout}, display=${display}`);
-         }
-         defer.resolve();
-      });
-   } else {
-      // 🟢 Enable xscreensaver blanking after timeout
-      /*
-      exec(`DISPLAY=${display} xscreensaver-command -exit`, (error) => {
-         if (error) self.logger.warn(logPrefix + " xscreensaver not running, starting it...");
-         exec(`DISPLAY=${display} xscreensaver`, () => { });
-      });
-*/
-      exec(`DISPLAY=${display} xscreensaver`, (error) => {
-         if (error) {
-            self.logger.error(logPrefix + " Error activating xscreensaver: " + error);
-         } else {
-            self.logger.info(logPrefix + " xscreensaver activated on display=" + display);
-         }
-         defer.resolve();
-      });
-   }
-
-   return defer.promise;
-};
-
-
-// inside your plugin object
 vkiosksettings.prototype.xscreensettings = function () {
    const self = this;
    const defer = libQ.defer();
 
    const display = self.getDisplaynumber();
 
-   // Kill any existing demo instance before starting a new one
    exec(`pkill -f xscreensaver-demo || true`);
+   exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
 
-   // Launch xscreensaver-demo on the correct display
    const cmd = `DISPLAY=${display} xscreensaver-demo`;
    exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
       if (error) {
