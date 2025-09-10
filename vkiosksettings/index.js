@@ -296,7 +296,7 @@ vkiosksettings.prototype.checkIfPlay = function () {
       );
 
       // ---- Wake conditions ----
-      if ((data.status === "play" && noifplay) || timeout === 0) {
+      if ((data.status === "play" && noifplay) || timeout === 0 && screensavertype === "dpms") {
          self.wakeupScreen();
          self.logger.info(`${logPrefix} → Wakeup triggered`);
          return;
@@ -338,8 +338,11 @@ vkiosksettings.prototype.sleepScreen = function () {
          self.logger.info(logPrefix + " sleepScreen: DPMS → screen");
       } else if (screensavertype === "xscreensaver") {
          // Use xscreensaver to blank/activate
-         exec(`DISPLAY=${display} xscreensaver-command -activate`);
-         self.logger.info(logPrefix + " sleepScreen: xscreensaver → activate");
+         exec(`DISPLAY=${display} xscreensaver -nosplash`, () => {
+            self.logger.info(logPrefix + " wakeupScreen: xscreensaver restarted");
+         });
+         //  exec(`DISPLAY=${display} xscreensaver-command -activate`);
+         //  self.logger.info(logPrefix + " sleepScreen: xscreensaver → activate");
       } else {
          self.logger.warn(logPrefix + " sleepScreen: Unknown screensaver type, doing nothing");
       }
@@ -357,12 +360,14 @@ vkiosksettings.prototype.wakeupScreen = function () {
    try {
       if (screensavertype === "dpms") {
          // Wake DPMS screen
-         exec(`/usr/bin/xset -display ${display} dpms force on`);
+         exec(`/usr/bin/xset -display ${display} -dpms`);
          self.logger.info(logPrefix + " wakeupScreen: DPMS → screen on");
       } else if (screensavertype === "xscreensaver") {
          // Disable xscreensaver blanking
-         exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
-         self.logger.info(logPrefix + " wakeupScreen: xscreensaver → deactivate");
+         exec("pkill -9 xscreensaver || true", () => {
+            self.logger.info(logPrefix + " sleepScreen: xscreensaver killed");
+         });
+
       } else {
          self.logger.warn(logPrefix + " wakeupScreen: Unknown screensaver type, doing nothing");
       }
@@ -378,7 +383,9 @@ vkiosksettings.prototype.xscreensettings = function () {
    const display = self.getDisplaynumber();
 
    exec(`pkill -f xscreensaver-demo || true`);
-   exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
+            exec("pkill -9 xscreensaver || true")
+
+  // exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
 
    const cmd = `DISPLAY=${display} xscreensaver-demo`;
    exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
