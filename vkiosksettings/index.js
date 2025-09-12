@@ -40,7 +40,6 @@ vkiosksettings.prototype.getConfigurationFiles = function () {
 vkiosksettings.prototype.onStop = function () {
    var self = this;
    var defer = libQ.defer();
-   self.stopvkiosksettingsservice();
    defer.resolve();
    return defer.promise;
 };
