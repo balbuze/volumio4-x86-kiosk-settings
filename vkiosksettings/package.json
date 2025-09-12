@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Set your display for the Kiosk",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
   "license": "",
   "repository": "https://github.com/balbuze/volumio4-x86-kiosk-settings",
   "volumio_info": {
-    "prettyName": "Kiosk-settings",
+    "prettyName": "Display configuration",
     "plugin_type": "user_interface",
     "icon": "fa-desktop",
     "architectures": [
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Kiosk settings",
-    "changelog": "split functions",
+    "changelog": "brightness",
     "manually_installed": true
   },
   "engines": {

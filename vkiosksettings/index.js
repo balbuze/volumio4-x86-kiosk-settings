@@ -103,11 +103,22 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.value', tcvalue.value);
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
 
-         var hidecursor = self.config.get('hidecursor', false);
-         uiconf.sections[0].content[2].value = hidecursor;
+         var brightness = self.config.get('brigthness');
+         self.logger.info(logPrefix+'brightness UI ' + brightness)
+         uiconf.sections[0].content[2].config.bars[0].value = brightness;
 
-         uiconf.sections[0].content[5].value = self.config.get('timeout');
-         uiconf.sections[0].content[5].attributes = [
+
+         var hidecursor = self.config.get('hidecursor', false);
+         uiconf.sections[0].content[3].value = hidecursor;
+
+
+         var xsvalue = self.config.get('screensavertype') || { value: "dpms", label: "dpms" };
+
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[4].value.value', xsvalue.value);
+         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[4].value.label', xsvalue.label);
+
+         uiconf.sections[0].content[6].value = self.config.get('timeout');
+         uiconf.sections[0].content[6].attributes = [
             {
                placeholder: 120,
                maxlength: 4,
@@ -115,12 +126,8 @@ vkiosksettings.prototype.getUIConfig = function () {
                max: 1000
             }
          ];
-         var xsvalue = self.config.get('screensavertype') || { value: "dpms", label: "dpms" };
 
-         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[3].value.value', xsvalue.value);
-         self.configManager.setUIConfigParam(uiconf, 'sections[0].content[3].value.label', xsvalue.label);
-
-         uiconf.sections[0].content[6].value = self.config.get('noifplay');
+         uiconf.sections[0].content[7].value = self.config.get('noifplay');
 
          defer.resolve(uiconf);
       })
@@ -383,9 +390,9 @@ vkiosksettings.prototype.xscreensettings = function () {
    const display = self.getDisplaynumber();
 
    exec(`pkill -f xscreensaver-demo || true`);
-            exec("pkill -9 xscreensaver || true")
+   exec("pkill -9 xscreensaver || true")
 
-  // exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
+   // exec(`DISPLAY=${display} xscreensaver-command -deactivate`);
 
    const cmd = `DISPLAY=${display} xscreensaver-demo`;
    exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
@@ -401,8 +408,40 @@ vkiosksettings.prototype.xscreensettings = function () {
    return defer.promise;
 };
 
+vkiosksettings.prototype.setBrightness = function (value) {
+   const self = this;
+   const display = self.getDisplaynumber();
+
+   // Clamp between 0.1 and 1.0 (xrandr rejects 0 or >1)
+   const brightness = Math.max(0.1, Math.min(1.0, value));
+
+   try {
+      // Detect connected screen
+      self.detectConnectedScreen().then((screen) => {
+         if (!screen) {
+            self.logger.error(logPrefix + " No connected screen found for brightness change");
+            return;
+         }
+
+         exec(`DISPLAY=${display} xrandr --output ${screen} --brightness ${brightness}`, (err) => {
+            if (err) {
+               self.logger.error(logPrefix + " Failed to set brightness: " + err);
+            } else {
+               self.logger.info(logPrefix + ` Brightness set to ${brightness} for screen ${screen}`);
+            }
+         });
+      });
+   } catch (err) {
+      self.logger.error(logPrefix + " setBrightness error: " + err);
+   }
+};
+
+
 vkiosksettings.prototype.savescreensettings = function (data) {
    const self = this;
+
+   var brightness = (data['brightness']);
+   //      self.logger.error(logPrefix + " setBrightness error: " + brightness);
 
    self.config.set('rotatescreen', {
       value: data['rotatescreen'].value,
@@ -413,7 +452,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       value: data['touchcorrection'].value,
       label: data['touchcorrection'].label
    });
-
+   self.config.set('brigthness', brightness)
    self.config.set('hidecursor', data['hidecursor']);
 
    // validate timeout
@@ -462,7 +501,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       self.refreshUI();
       self.checkIfPlay();
       self.applyscreensettings();
-
+      self.setBrightness(brightness);
       // ✅ Apply screensaver immediately
       try {
          const state = self.commandRouter.volumioGetState();
@@ -481,6 +520,11 @@ vkiosksettings.prototype.savescreensettings = function (data) {
 
 };
 
+vkiosksettings.prototype.applyscreensettings = async function () {
+   await this.applyRotation();
+   await this.applyTouchCorrection();
+   this.applyCursorSetting();
+};
 
 vkiosksettings.prototype.detectTouchscreen = function () {
    const self = this;
@@ -582,10 +626,4 @@ vkiosksettings.prototype.applyCursorSetting = function () {
    } catch (err) {
       self.logger.error(logPrefix + " applyCursorSetting error: " + err);
    }
-};
-
-vkiosksettings.prototype.applyscreensettings = async function () {
-   await this.applyRotation();
-   await this.applyTouchCorrection();
-   this.applyCursorSetting();
 };
