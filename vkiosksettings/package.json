@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.9",
+  "version": "0.0.11",
   "description": "Set your display for the Kiosk",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Kiosk settings",
-    "changelog": "cosmetic"
+    "changelog": "lid state"
   },
   "engines": {
     "node": ">=20",

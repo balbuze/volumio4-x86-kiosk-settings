@@ -9,6 +9,7 @@ var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 const io = require('socket.io-client');
+const path = require("path");
 const logPrefix = "vkiosksettings --- "
 // Define the vkiosksettings class
 module.exports = vkiosksettings;
@@ -45,22 +46,24 @@ vkiosksettings.prototype.onStop = function () {
 };
 
 vkiosksettings.prototype.onStart = function () {
-   var self = this;
-   var defer = libQ.defer();
+   const self = this;
+   const defer = libQ.defer();
+
    self.socket = io.connect('http://localhost:3000');
    self.fixXauthority();
-   // self.startvkiosksettingsservice();
-   setTimeout(function () {
+
+   // Delay to ensure X server is ready
+
+   setTimeout(async function () {
       self.checkIfPlay();
-      self.getDisplaynumber();
-      self.applyscreensettings();
-
+      const display = self.getDisplaynumber();
+      await self.applyscreensettings();
+      self.monitorLid(); // start monitoring lid events
    }, 2000);
-   defer.resolve();
 
+   defer.resolve();
    return defer.promise;
 };
-
 
 vkiosksettings.prototype.onRestart = function () {
    var self = this;
@@ -103,7 +106,7 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
 
          var brightness = self.config.get('brigthness');
-        // self.logger.info(logPrefix+' brightness UI ' + brightness)
+         // self.logger.info(logPrefix+' brightness UI ' + brightness)
          uiconf.sections[0].content[2].config.bars[0].value = brightness;
 
 
@@ -270,6 +273,54 @@ vkiosksettings.prototype.ensureXscreensaver = function () {
       }
    });
 };
+
+vkiosksettings.prototype.monitorLid = function () {
+   const self = this;
+   const display = self.getDisplaynumber();
+
+   // Detect all lid devices dynamically
+   const lidPaths = [];
+   const acpiPath = '/proc/acpi/button/lid/';
+   if (fs.existsSync(acpiPath)) {
+      const lids = fs.readdirSync(acpiPath);
+      lids.forEach(lid => {
+         const statePath = path.join(acpiPath, lid, 'state');
+         if (fs.existsSync(statePath)) lidPaths.push(statePath);
+      });
+   }
+
+   if (lidPaths.length === 0) {
+      self.logger.warn(logPrefix + " No ACPI lid devices detected, lid monitoring disabled.");
+      return;
+   }
+
+   self.logger.info(logPrefix+` Monitoring lid(s): ${lidPaths.join(', ')}`);
+   let lidClosed = false;
+
+   setInterval(() => {
+      try {
+         let anyClosed = false;
+         for (const lidFile of lidPaths) {
+            const state = fs.readFileSync(lidFile, 'utf8').trim();
+            if (state.toLowerCase().includes('closed')) anyClosed = true;
+         }
+
+         if (anyClosed && !lidClosed) {
+            lidClosed = true;
+            self.logger.info(logPrefix + " Lid closed — turning screen off via DPMS");
+            exec(`/usr/bin/xset -display ${display} dpms force off`);
+         } else if (!anyClosed && lidClosed) {
+            lidClosed = false;
+            self.logger.info(logPrefix + " Lid opened — turning screen on via DPMS");
+            exec(`/usr/bin/xset -display ${display} dpms force on`);
+         }
+      } catch (err) {
+         self.logger.error("Error reading lid state: " + err);
+      }
+   }, 1000); // check every 1 second
+};
+
+
 
 vkiosksettings.prototype.checkIfPlay = function () {
    const self = this;
