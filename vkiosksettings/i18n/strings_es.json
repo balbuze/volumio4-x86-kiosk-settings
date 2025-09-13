@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Activar salvapantallas en (s)",
     "SCREENSAVER_DOC":"Configura el tiempo de espera en segundos. 0 = sin salvapantallas.",
     "DPMS":"Apagar la pantalla",
+    "XSCREENSAVER": "Xscreensaver, un conjunto de bonitos salvapantallas",
     "NO_SS_IF_PLAY":"Desactivar salvapantallas durante reproducción",
     "NO_SS_IF_PLAY_DOC":"Desactiva el salvapantallas durante la reproducción. El tiempo se aplica al detenerse.",
     "XSTYPE":"🌙 Tipo de salvapantallas",

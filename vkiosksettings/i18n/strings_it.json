@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Attiva screensaver dopo (s)",
     "SCREENSAVER_DOC":"Imposta il timeout prima dello screensaver in secondi. 0 = nessuno screensaver.",
     "DPMS":"Spegni lo schermo",
+    "XSCREENSAVER": "Xscreensaver, una raccolta di salvaschermi carini",
     "NO_SS_IF_PLAY":"Disattiva screensaver durante la riproduzione",
     "NO_SS_IF_PLAY_DOC":"Disattiva lo screensaver durante la riproduzione. Il timeout si applica allo stop.",
     "XSTYPE":"🌙 Tipo di screensaver",

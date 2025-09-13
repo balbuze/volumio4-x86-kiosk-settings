@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Activer l’économiseur après (s)",
     "SCREENSAVER_DOC":"Définir le délai avant l’économiseur en secondes. 0 = pas d’économiseur.",
     "DPMS":"Éteindre l’écran",
+    "XSCREENSAVER": "Xscreensaver, un ensemble de jolis économiseurs d’écran",
     "NO_SS_IF_PLAY":"Désactiver l’économiseur en lecture",
     "NO_SS_IF_PLAY_DOC":"Désactive l’économiseur pendant la lecture. Le délai s’applique à l’arrêt.",
     "XSTYPE":"🌙 Type d’économiseur",

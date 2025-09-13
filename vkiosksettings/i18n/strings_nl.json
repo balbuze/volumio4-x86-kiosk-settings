@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Schermbeveiliging inschakelen na (s)",
     "SCREENSAVER_DOC":"Stel de timeout in seconden in. 0 = geen schermbeveiliging.",
     "DPMS":"Scherm uitschakelen",
+    "XSCREENSAVER": "Xscreensaver, een verzameling leuke schermbeveiligingen",
     "NO_SS_IF_PLAY":"Schermbeveiliging uitschakelen tijdens afspelen",
     "NO_SS_IF_PLAY_DOC":"Schakelt de schermbeveiliging uit tijdens het afspelen. Timeout geldt bij stoppen.",
     "XSTYPE":"🌙 Type schermbeveiliging",

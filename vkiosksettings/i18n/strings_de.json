@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Bildschirmschoner aktivieren nach (s)",
     "SCREENSAVER_DOC":"Timeout in Sekunden einstellen. 0 = kein Bildschirmschoner.",
     "DPMS":"Bildschirm ausschalten",
+    "XSCREENSAVER": "Xscreensaver, eine Sammlung schöner Bildschirmschoner",
     "NO_SS_IF_PLAY":"Bildschirmschoner während Wiedergabe deaktivieren",
     "NO_SS_IF_PLAY_DOC":"Deaktiviert den Bildschirmschoner während der Wiedergabe. Timeout gilt beim Stoppen.",
     "XSTYPE":"🌙 Bildschirmschoner-Typ",

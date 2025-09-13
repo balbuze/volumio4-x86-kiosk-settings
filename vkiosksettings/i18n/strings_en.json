@@ -19,6 +19,7 @@
     "SCREENSAVER":"⏳ Enable screen saver in (s)",
     "SCREENSAVER_DOC":"Set the timeout before screensaver in seconds. 0 = no screensaver.",
     "DPMS":"Turn the screen off",
+    "XSCREENSAVER":"Xscreensaver, a set of nice screensavers",
     "NO_SS_IF_PLAY":"Disable screensaver when playing",
     "NO_SS_IF_PLAY_DOC":"Disable screensaver when playing. Timeout is aplied when stop plyaing.",
     "XSTYPE":"🌙 Screensaver type",
