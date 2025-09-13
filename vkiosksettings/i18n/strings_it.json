@@ -18,6 +18,7 @@
     "MOUSE_C_DOC":"Se abilitato, il cursore del mouse viene nascosto quando non utilizzato.",
     "SCREENSAVER":"⏳ Attiva screensaver dopo (s)",
     "SCREENSAVER_DOC":"Imposta il timeout prima dello screensaver in secondi. 0 = nessuno screensaver.",
+    "DPMS":"Spegni lo schermo",
     "NO_SS_IF_PLAY":"Disattiva screensaver durante la riproduzione",
     "NO_SS_IF_PLAY_DOC":"Disattiva lo screensaver durante la riproduzione. Il timeout si applica allo stop.",
     "XSTYPE":"🌙 Tipo di screensaver",

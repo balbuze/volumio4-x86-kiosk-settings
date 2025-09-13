@@ -18,6 +18,7 @@
     "MOUSE_C_DOC":"Wenn aktiviert, wird der Mauszeiger ausgeblendet, wenn er nicht verwendet wird.",
     "SCREENSAVER":"⏳ Bildschirmschoner aktivieren nach (s)",
     "SCREENSAVER_DOC":"Timeout in Sekunden einstellen. 0 = kein Bildschirmschoner.",
+    "DPMS":"Bildschirm ausschalten",
     "NO_SS_IF_PLAY":"Bildschirmschoner während Wiedergabe deaktivieren",
     "NO_SS_IF_PLAY_DOC":"Deaktiviert den Bildschirmschoner während der Wiedergabe. Timeout gilt beim Stoppen.",
     "XSTYPE":"🌙 Bildschirmschoner-Typ",

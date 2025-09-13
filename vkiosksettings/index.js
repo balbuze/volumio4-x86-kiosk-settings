@@ -103,7 +103,7 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
 
          var brightness = self.config.get('brigthness');
-         self.logger.info(logPrefix+'brightness UI ' + brightness)
+        // self.logger.info(logPrefix+' brightness UI ' + brightness)
          uiconf.sections[0].content[2].config.bars[0].value = brightness;
 
 
@@ -382,7 +382,7 @@ vkiosksettings.prototype.wakeupScreen = function () {
    }
 };
 
-vkiosksettings.prototype.xscreensettings = function () {
+vkiosksettings.prototype.xscreensettings = function (data) {
    const self = this;
    const defer = libQ.defer();
 

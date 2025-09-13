@@ -1,12 +1,11 @@
 {
   "page": {
-    "label": "TRANSLATE.TITLE"
+    "label": "TRANSLATE.DISPLAY_SETTINGS"
   },
   "sections": [
     {
       "id": "kiosk",
       "element": "section",
-      "label": "TRANSLATE.DISPLAY_SETTINGS",
       "onSave": {
         "type": "controller",
         "endpoint": "user_interface/vkiosksettings",
@@ -117,7 +116,7 @@
           "options": [
             {
               "value": "dpms",
-              "label": "dpms"
+              "label": "TRANSLATE.DPMS"
             },
             {
               "value": "xscreensaver",
