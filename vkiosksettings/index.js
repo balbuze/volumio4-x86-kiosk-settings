@@ -588,13 +588,13 @@ vkiosksettings.prototype.detectTouchscreen = function () {
 
          const lines = stdout.split("\n");
 
-         // Find all lines containing "touchscreen"
-         const matches = lines.filter(line =>
-            /touchscreen/i.test(line)
-         );
+         // Extended regex for touch-like devices
+         const regex = /(touchscreen|touch|finger|multitouch|pen|stylus)/i;
+         const matches = lines.filter(line => regex.test(line));
 
          if (matches.length === 0) {
-            return resolve(null); // no touchscreen found
+            self.logger.info(logPrefix + " No touchscreen-like input devices found.");
+            return resolve('none'); // <-- return "none"
          }
 
          // Extract IDs and names
@@ -605,11 +605,13 @@ vkiosksettings.prototype.detectTouchscreen = function () {
             return { id, name };
          });
 
-         self.logger.info(logPrefix + " Touchscreens detected: " + JSON.stringify(devices));
+         self.logger.info(logPrefix + " Touch devices detected: " + JSON.stringify(devices));
+
          resolve(devices[0].id || devices[0].name);
       });
    });
 };
+
 
 // 1. Rotate screen
 vkiosksettings.prototype.applyRotation = async function () {
