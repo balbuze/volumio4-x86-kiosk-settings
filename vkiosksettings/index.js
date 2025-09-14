@@ -5,12 +5,14 @@ var libQ = require('kew');
 var fs = require('fs-extra');
 var libFsExtra = require('fs-extra');
 var config = new (require('v-conf'))();
-var exec = require('child_process').exec;
+//var exec = require('child_process').exec;
+const { exec } = require("child_process");
+
 var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 const io = require('socket.io-client');
 const path = require("path");
-const logPrefix = "vkiosksettings --- "
+const logPrefix = "Display-configuration --- "
 // Define the vkiosksettings class
 module.exports = vkiosksettings;
 
@@ -635,7 +637,6 @@ vkiosksettings.prototype.applyRotation = async function () {
    }
 };
 
-// 2. Apply touchscreen correction
 vkiosksettings.prototype.applyTouchCorrection = async function () {
    const self = this;
    const display = self.getDisplaynumber();
@@ -648,33 +649,31 @@ vkiosksettings.prototype.applyTouchCorrection = async function () {
          return;
       }
 
-      let matrix = "1 0 0  0 1 0  0 0 1"; // identity (default, no correction)
+      let matrix = "1 0 0  0 1 0  0 0 1";
       switch (touchcorrection) {
-         case "swap-lr":
-            matrix = "0 -1 1  1 0 0  0 0 1";
-            break;
-         case "swap-ud":
-            matrix = "-1 0 1  0 -1 1  0 0 1";
-            break;
-         case "swap-both":
-            matrix = "0 1 0  -1 0 1  0 0 1";
-            break;
+         case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
+         case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
+         case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
       }
 
-      for (const dev of touchDevices) {
-         exec(`DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`, (error) => {
-            if (error) {
-               self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${error.message}`);
-            } else {
-               self.logger.info(logPrefix + ` Touch correction '${touchcorrection}' applied to ${dev.name} (id=${dev.id})`);
-            }
-         });
+      for (let dev of touchDevices) {
+         exec(`DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`,
+            (error, stdout, stderr) => {
+               if (error) {
+                  if (stderr.includes("property") || stderr.includes("failed")) {
+                     self.logger.warn(logPrefix + ` Touch device ${dev.name} (id=${dev.id}) does not support matrix transform`);
+                  } else {
+                     self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${error.message}`);
+                  }
+               } else {
+                  self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection} to ${dev.name} (id=${dev.id})`);
+               }
+            });
       }
    } catch (err) {
       self.logger.error(logPrefix + " applyTouchCorrection error: " + err);
    }
 };
-
 
 
 // 3. Handle cursor hiding
