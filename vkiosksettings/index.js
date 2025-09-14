@@ -96,9 +96,11 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].value.label', rvalue.label);
 
          let touchscreenId = await self.detectTouchscreen();
-         if (!touchscreenId || touchscreenId === 'none') {
+         let touchDevices = await self.detectTouchscreen();
+         if (!touchDevices || touchDevices.length === 0) {
             uiconf.sections[0].content[1].hidden = true;
          }
+
 
          var tcvalue = self.config.get('touchcorrection') || { value: "none", label: "none" };
 
@@ -294,7 +296,7 @@ vkiosksettings.prototype.monitorLid = function () {
       return;
    }
 
-   self.logger.info(logPrefix+` Monitoring lid(s): ${lidPaths.join(', ')}`);
+   self.logger.info(logPrefix + ` Monitoring lid(s): ${lidPaths.join(', ')}`);
    let lidClosed = false;
 
    setInterval(() => {
@@ -588,13 +590,13 @@ vkiosksettings.prototype.detectTouchscreen = function () {
 
          const lines = stdout.split("\n");
 
-         // Extended regex for touch-like devices
-         const regex = /(touchscreen|touch|finger|multitouch|pen|stylus)/i;
-         const matches = lines.filter(line => regex.test(line));
+         // Match all possible touch input types
+         const matches = lines.filter(line =>
+            /(touchscreen|touch|finger|multitouch|pen|stylus)/i.test(line)
+         );
 
          if (matches.length === 0) {
-            self.logger.info(logPrefix + " No touchscreen-like input devices found.");
-            return resolve('none'); // <-- return "none"
+            return resolve([]); // no touch-like devices
          }
 
          // Extract IDs and names
@@ -603,14 +605,15 @@ vkiosksettings.prototype.detectTouchscreen = function () {
             const id = idMatch ? idMatch[1] : null;
             const name = line.replace(/\s*id=\d+.*/, "").trim();
             return { id, name };
-         });
+         }).filter(dev => dev.id); // keep only valid ones
 
          self.logger.info(logPrefix + " Touch devices detected: " + JSON.stringify(devices));
 
-         resolve(devices[0].id || devices[0].name);
+         resolve(devices); // return all devices (array of {id, name})
       });
    });
 };
+
 
 
 // 1. Rotate screen
@@ -632,7 +635,6 @@ vkiosksettings.prototype.applyRotation = async function () {
    }
 };
 
-
 // 2. Apply touchscreen correction
 vkiosksettings.prototype.applyTouchCorrection = async function () {
    const self = this;
@@ -640,25 +642,39 @@ vkiosksettings.prototype.applyTouchCorrection = async function () {
    const touchcorrection = self.config.get("touchcorrection").value;
 
    try {
-      const touchscreenId = await self.detectTouchscreen();
-      if (!touchscreenId || touchscreenId === "none") {
+      const touchDevices = await self.detectTouchscreen();
+      if (!touchDevices || touchDevices.length === 0) {
          self.logger.info(logPrefix + " No touchscreen detected, skipping correction.");
          return;
       }
 
-      let matrix = "1 0 0  0 1 0  0 0 1";
+      let matrix = "1 0 0  0 1 0  0 0 1"; // identity (default, no correction)
       switch (touchcorrection) {
-         case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
-         case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
-         case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
+         case "swap-lr":
+            matrix = "0 -1 1  1 0 0  0 0 1";
+            break;
+         case "swap-ud":
+            matrix = "-1 0 1  0 -1 1  0 0 1";
+            break;
+         case "swap-both":
+            matrix = "0 1 0  -1 0 1  0 0 1";
+            break;
       }
 
-      exec(`DISPLAY=${display} xinput set-prop ${touchscreenId} "Coordinate Transformation Matrix" ${matrix}`);
-      self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection}`);
+      for (const dev of touchDevices) {
+         exec(`DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`, (error) => {
+            if (error) {
+               self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${error.message}`);
+            } else {
+               self.logger.info(logPrefix + ` Touch correction '${touchcorrection}' applied to ${dev.name} (id=${dev.id})`);
+            }
+         });
+      }
    } catch (err) {
       self.logger.error(logPrefix + " applyTouchCorrection error: " + err);
    }
 };
+
 
 
 // 3. Handle cursor hiding
