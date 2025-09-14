@@ -109,7 +109,7 @@ vkiosksettings.prototype.getUIConfig = function () {
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.value', tcvalue.value);
          self.configManager.setUIConfigParam(uiconf, 'sections[0].content[1].value.label', tcvalue.label);
 
-         var brightness = self.config.get('brigthness');
+         var brightness = self.config.get('brightness');
          // self.logger.info(logPrefix+' brightness UI ' + brightness)
          uiconf.sections[0].content[2].config.bars[0].value = brightness;
 
@@ -462,10 +462,10 @@ vkiosksettings.prototype.xscreensettings = function (data) {
    return defer.promise;
 };
 
-vkiosksettings.prototype.setBrightness = function (value) {
+vkiosksettings.prototype.setBrightness = function () {
    const self = this;
    const display = self.getDisplaynumber();
-
+   var value = self.config.get('brightness')
    // Clamp between 0.1 and 1.0 (xrandr rejects 0 or >1)
    const brightness = Math.max(0.1, Math.min(1.0, value));
 
@@ -506,7 +506,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       value: data['touchcorrection'].value,
       label: data['touchcorrection'].label
    });
-   self.config.set('brigthness', brightness)
+   self.config.set('brightness', brightness)
    self.config.set('hidecursor', data['hidecursor']);
 
    // validate timeout
@@ -555,7 +555,6 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       self.refreshUI();
       self.checkIfPlay();
       self.applyscreensettings();
-      self.setBrightness(brightness);
       // ✅ Apply screensaver immediately
       try {
          const state = self.commandRouter.volumioGetState();
@@ -570,14 +569,18 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       } catch (err) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   }, 500);
+   }, 1500);
 
 };
 
 vkiosksettings.prototype.applyscreensettings = async function () {
+   const self = this;
+
    await this.applyRotation();
    await this.applyTouchCorrection();
    this.applyCursorSetting();
+   self.setBrightness();
+
 };
 
 vkiosksettings.prototype.detectTouchscreen = function () {
@@ -683,13 +686,24 @@ vkiosksettings.prototype.applyCursorSetting = function () {
    const hidecursor = self.config.get("hidecursor");
 
    try {
-      exec("pkill -f unclutter");  // always stop first
-      if (hidecursor) {
-         exec(`DISPLAY=${display} unclutter-xfixes -idle 3 -root &`);
-         self.logger.info(logPrefix + " unclutter started");
-      } else {
-         self.logger.info(logPrefix + " unclutter stopped");
-      }
+      // Stop any existing unclutter processes first
+      exec("/bin/echo volumio | /usr/bin/sudo -S pkill -9 -f unclutter", { uid: 1000, gid: 1000 }, (err) => {
+         if (err) self.logger.info(logPrefix + " No unclutter process to stop");
+
+         if (hidecursor) {
+            // Start unclutter as volumio user
+            exec(`/bin/echo volumio | /usr/bin/sudo -S DISPLAY=${display} unclutter-xfixes -idle 3`, { uid: 1000, gid: 1000 }, (err2) => {
+               if (err2) {
+                  self.logger.error(logPrefix + " Error starting unclutter: " + err2);
+               } else {
+                  self.logger.info(logPrefix + " unclutter started as volumio user");
+               }
+            });
+         } else {
+            self.logger.info(logPrefix + " unclutter stopped");
+         }
+      });
+
    } catch (err) {
       self.logger.error(logPrefix + " applyCursorSetting error: " + err);
    }

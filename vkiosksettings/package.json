@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Set your display for the Kiosk",
   "main": "index.js",
   "scripts": {
