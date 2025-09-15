@@ -1,7 +1,7 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.14",
-  "description": "Set your display for the Kiosk",
+  "version": "0.0.15",
+  "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
