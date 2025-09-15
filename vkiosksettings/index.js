@@ -384,8 +384,6 @@ vkiosksettings.prototype.checkIfPlay = function () {
       self.logger.info(`${logPrefix} → No action taken`);
    });
 };
-
-
 vkiosksettings.prototype.sleepScreen = function () {
    const self = this;
    const display = self.getDisplaynumber();
@@ -399,6 +397,12 @@ vkiosksettings.prototype.sleepScreen = function () {
          self.logger.info(logPrefix + " sleepScreen: DPMS → screen off in " + timeout + "s");
 
       } else if (screensavertype === "xscreensaver") {
+         // stop keepalive when we want xscreensaver active
+         if (self._xscreensaverInterval) {
+            clearInterval(self._xscreensaverInterval);
+            self._xscreensaverInterval = null;
+         }
+
          // Ensure xscreensaver daemon is running
          exec(`pgrep xscreensaver || (DISPLAY=${display} xscreensaver -no-splash &)`, (error) => {
             if (error) {
@@ -436,7 +440,7 @@ vkiosksettings.prototype.wakeupScreen = function () {
          self.logger.info(logPrefix + " wakeupScreen: DPMS → screen on");
 
       } else if (screensavertype === "xscreensaver") {
-         // Politely tell xscreensaver to disable blanking (instead of killing)
+         // tell xscreensaver to disable blanking (instead of killing)
          exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
             if (error) {
                self.logger.error(logPrefix + " wakeupScreen: Failed to deactivate xscreensaver → " + error);
@@ -445,6 +449,19 @@ vkiosksettings.prototype.wakeupScreen = function () {
             }
          });
 
+         // periodically deactivate xscreensaver to keep screen awake
+         if (!self._xscreensaverInterval) {
+            self._xscreensaverInterval = setInterval(() => {
+               exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
+                  if (error) {
+                     self.logger.error(logPrefix + " keepAlive: xscreensaver deactivate failed → " + error);
+                  } else {
+                     self.logger.debug(logPrefix + " keepAlive: xscreensaver deactivated");
+                  }
+               });
+            }, 2100); // every 50s
+         }
+
       } else {
          self.logger.warn(logPrefix + " wakeupScreen: Unknown screensaver type, doing nothing");
       }
@@ -452,6 +469,7 @@ vkiosksettings.prototype.wakeupScreen = function () {
       self.logger.error(logPrefix + " wakeupScreen error: " + err);
    }
 };
+
 
 /*
 vkiosksettings.prototype.xscreensettings = function (data) {

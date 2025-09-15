@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {
