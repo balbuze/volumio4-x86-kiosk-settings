@@ -413,10 +413,10 @@ vkiosksettings.prototype.sleepScreen = function () {
          // Then activate the screensaver
          exec(`DISPLAY=${display} xscreensaver-command -activate`, (error) => {
             if (error) {
-               self.logger.error(logPrefix + " sleepScreen: failed to activate xscreensaver → " + error);
-            } else {
-               self.logger.info(logPrefix + " sleepScreen: xscreensaver activated (screen blanked)");
+               self.logger.warn(logPrefix + " sleepScreen: xscreensaver not running or failed → " + error.message);
+               return;
             }
+            self.logger.info(logPrefix + " sleepScreen: xscreensaver activated (screen blanked)");
          });
 
       } else {
@@ -452,15 +452,24 @@ vkiosksettings.prototype.wakeupScreen = function () {
          // periodically deactivate xscreensaver to keep screen awake
          if (!self._xscreensaverInterval) {
             self._xscreensaverInterval = setInterval(() => {
-               exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
-                  if (error) {
-                     self.logger.error(logPrefix + " keepAlive: xscreensaver deactivate failed → " + error);
-                  } else {
-                     self.logger.debug(logPrefix + " keepAlive: xscreensaver deactivated");
+               exec(`pgrep -x xscreensaver`, (checkErr, stdout) => {
+                  if (checkErr || !stdout) {
+                     // Not running → skip silently
+                     self.logger.debug(logPrefix + " keepAlive: xscreensaver not running, skipping deactivate");
+                     return;
                   }
+
+                  exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
+                     if (error) {
+                        self.logger.warn(logPrefix + " keepAlive: xscreensaver deactivate failed → " + error.message);
+                     } else {
+                        self.logger.debug(logPrefix + " keepAlive: xscreensaver deactivated");
+                     }
+                  });
                });
-            }, 2100); // every 50s
+            }, 2100); // every ~2s
          }
+
 
       } else {
          self.logger.warn(logPrefix + " wakeupScreen: Unknown screensaver type, doing nothing");
@@ -496,43 +505,54 @@ vkiosksettings.prototype.xscreensettings = function (data) {
 
    return defer.promise;
 };
-*/
-vkiosksettings.prototype.xscreensettings = function (data) {
+
+*/vkiosksettings.prototype.xscreensettings = function (data) {
    const self = this;
    const defer = libQ.defer();
    const display = self.getDisplaynumber();
 
-   // Kill previous xscreensaver-settings GUI if open
-   exec("pkill -f xscreensaver-settings || true");
-
-   // Ensure xscreensaver daemon is running
-   exec(`DISPLAY=${display} xscreensaver -no-splash &`, { uid: 1000, gid: 1000 }, (error) => {
-      if (error) {
-         self.logger.error(logPrefix + ": Failed to start xscreensaver daemon: " + error);
-      }
-   });
-   exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
-      if (error) {
-         self.logger.error(logPrefix + " xcreensettings: Failed to deactivate xscreensaver → " + error);
+   // 1. Kill any previous instances (daemon + settings GUI)
+   exec("pkill -f xscreensaver-settings; pkill -f xscreensaver", (killErr) => {
+      if (killErr) {
+         self.logger.warn(logPrefix + " xscreensettings: no previous xscreensaver processes to kill");
       } else {
-         self.logger.info(logPrefix + " xscreensettings: xscreensaver deactivated (screen on)");
+         self.logger.info(logPrefix + " xscreensettings: previous xscreensaver processes killed");
       }
-   });
 
-   // Launch xscreensaver-settings GUI
-   const cmd = `DISPLAY=${display} xscreensaver-settings`;
-   exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
-      if (error) {
-         self.logger.error(logPrefix + ": Failed to start xscreensaver-settings: " + error);
-         defer.reject(error);
-      } else {
-         self.logger.info(logPrefix + `: xscreensaver-settings started on display ${display}`);
-         defer.resolve();
-      }
+      // 2. Start daemon cleanly
+      exec(`DISPLAY=${display} xscreensaver -no-splash &`, { uid: 1000, gid: 1000 }, (error) => {
+         if (error) {
+            self.logger.error(logPrefix + ": Failed to start xscreensaver daemon: " + error);
+         } else {
+            self.logger.info(logPrefix + ": xscreensaver daemon started");
+         }
+
+         // 3. Deactivate so the screen is "on" when settings open
+         exec(`DISPLAY=${display} xscreensaver-command -deactivate`, (error) => {
+            if (error) {
+               self.logger.warn(logPrefix + " xscreensettings: Failed to deactivate xscreensaver → " + error);
+            } else {
+               self.logger.info(logPrefix + " xscreensettings: xscreensaver deactivated (screen on)");
+            }
+         });
+
+         // 4. Finally launch the settings GUI
+         const cmd = `DISPLAY=${display} xscreensaver-settings`;
+         exec(cmd, { uid: 1000, gid: 1000 }, (error, stdout, stderr) => {
+            if (error) {
+               self.logger.error(logPrefix + ": Failed to start xscreensaver-settings: " + error);
+               defer.reject(error);
+            } else {
+               self.logger.info(logPrefix + `: xscreensaver-settings started on display ${display}`);
+               defer.resolve();
+            }
+         });
+      });
    });
 
    return defer.promise;
 };
+
 
 vkiosksettings.prototype.setBrightness = function () {
    const self = this;
