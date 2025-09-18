@@ -245,6 +245,65 @@ vkiosksettings.prototype.detectConnectedScreen = function () {
    });
 };
 
+vkiosksettings.prototype.writeRotationConfig = function (screen, orientation, fbRotate) {
+   const self = this;
+   const path = "/data/plugins/user_interface/vkiosksettings/rotation.conf";
+
+   return new Promise((resolve, reject) => {
+      // Step 1: defaults
+      let currentScreen = "DSI-1";
+      let currentOrientation = "normal";
+      let currentFbRotate = 0;
+
+      // Step 2: read file if it exists
+      if (fs.existsSync(path)) {
+         try {
+            const data = fs.readFileSync(path, "utf8");
+            const lines = data.split("\n");
+
+            lines.forEach(line => {
+               if (/^set screen=/.test(line)) {
+                  const m = line.match(/video=(.*),panel_orientation=(.*)/);
+                  if (m) {
+                     currentScreen = m[1];
+                     currentOrientation = m[2];
+                  }
+               } else if (/^set fbcon=/.test(line)) {
+                  const m = line.match(/rotate:(\d+)/);
+                  if (m) currentFbRotate = m[1];
+               }
+            });
+         } catch (err) {
+            self.logger.warn(logPrefix + " Could not parse existing rotation.conf: " + err);
+         }
+      }
+
+      // Step 3: override with new values only if defined
+      if (screen !== undefined) currentScreen = screen;
+      if (orientation !== undefined) currentOrientation = orientation;
+      if (fbRotate !== undefined) currentFbRotate = fbRotate;
+
+      // Step 4: write the file
+      const content = [
+         `set screen=video=${currentScreen},panel_orientation=${currentOrientation}`,
+         `set efifb=video=efifb`,
+         `set fbcon=rotate:${currentFbRotate}`
+      ].join("\n") + "\n";
+
+      fs.writeFile(path, content, "utf8", (err) => {
+         if (err) {
+            self.logger.error(logPrefix + " Failed to write rotation file: " + err);
+            return reject(err);
+         }
+         self.logger.info(
+            logPrefix + ` Rotation config saved: screen=${currentScreen}, orientation=${currentOrientation}, fbcon=${currentFbRotate}`
+         );
+         resolve();
+      });
+   });
+};
+
+
 vkiosksettings.prototype.fixXauthority = function () {
    const self = this;
 
@@ -591,6 +650,8 @@ vkiosksettings.prototype.savescreensettings = function (data) {
 
    self.config.set('rotatescreen', {
       value: data['rotatescreen'].value,
+      po: data['rotatescreen'].po,
+      fbconv: data['rotatescreen'].fbconv,
       label: data['rotatescreen'].label
    });
 
@@ -648,6 +709,12 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       self.checkIfPlay();
       self.applyscreensettings();
 
+      // inside your applyRotation or savescreensettings
+
+
+      //await this.writeRotationConfig("HDMI-A-1", "normal", 0);
+      // or ("HDMI-A-1", "right", 1) depending on your case
+
       if (data['screensavertype'].value === 'dpms') {
          exec("pkill -f xscreensaver-settings || true");
          exec("pkill -f xscreensaver || true");
@@ -666,7 +733,7 @@ vkiosksettings.prototype.savescreensettings = function (data) {
       } catch (err) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   }, 500);
+   }, 1000);
 
 };
 
@@ -723,7 +790,16 @@ vkiosksettings.prototype.applyRotation = async function () {
    const self = this;
    const display = self.getDisplaynumber();
    const rotatescreen = self.config.get("rotatescreen").value;
+   const fbconv = self.config.get("rotatescreen").fbconv;
+   const orientation = self.config.get("rotatescreen").po;
 
+   const screen = await self.detectConnectedScreen();
+
+   try {
+      await this.writeRotationConfig(screen, orientation, fbconv);
+   } catch (err) {
+      self.logger.error(logPrefix + " applyRotation grub error: " + err);
+   }
    try {
       const screen = await self.detectConnectedScreen();
       if (!screen) {
@@ -741,6 +817,7 @@ vkiosksettings.prototype.applyTouchCorrection = async function () {
    const self = this;
    const display = self.getDisplaynumber();
    const touchcorrection = self.config.get("touchcorrection").value;
+
 
    try {
       const touchDevices = await self.detectTouchscreen();

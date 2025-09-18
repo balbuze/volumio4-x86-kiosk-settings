@@ -1,6 +1,6 @@
 {
   "name": "vkiosksettings",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Kiosk settings",
-    "changelog": "touch fix"
+    "changelog": "fbconv - screen grub"
   },
   "engines": {
     "node": ">=20",

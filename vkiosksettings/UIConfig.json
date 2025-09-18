@@ -36,18 +36,26 @@
           "options": [
             {
               "value": "normal",
+              "po":"normal",
+              "fbconv":"0",
               "label": "TRANSLATE.NORMAL"
             },
             {
               "value": "left",
+              "po":"left_side_up",
+              "fbconv":"3",
               "label": "TRANSLATE.LEFT"
             },
             {
               "value": "right",
+              "po":"right_side_up",
+              "fbconv":"1",
               "label": "TRANSLATE.RIGHT"
             },
             {
               "value": "inverted",
+              "po":"upside_down",
+              "fbconv": "2",
               "label": "TRANSLATE.INVERTED"
             }
           ]
