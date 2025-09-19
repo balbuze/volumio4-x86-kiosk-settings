@@ -43,6 +43,7 @@ vkiosksettings.prototype.getConfigurationFiles = function () {
 vkiosksettings.prototype.onStop = function () {
    var self = this;
    var defer = libQ.defer();
+   self.removeRotationConfig();
    defer.resolve();
    return defer.promise;
 };
@@ -74,11 +75,14 @@ vkiosksettings.prototype.onRestart = function () {
 
 vkiosksettings.prototype.onInstall = function () {
    var self = this;
+
    //Perform your installation tasks here
 };
 
 vkiosksettings.prototype.onUninstall = function () {
    var self = this;
+   self.removeRotationConfig();
+
 };
 
 vkiosksettings.prototype.getUIConfig = function () {
@@ -245,22 +249,22 @@ vkiosksettings.prototype.detectConnectedScreen = function () {
    });
 };
 
+
 vkiosksettings.prototype.writeRotationConfig = function (screen, orientation, fbRotate) {
    const self = this;
-   const path = "/data/plugins/user_interface/vkiosksettings/rotation.conf";
+   const path = "/boot/boot_screen_rotation.cfg";
 
    return new Promise((resolve, reject) => {
-      // Step 1: defaults
+      // defaults
       let currentScreen = "DSI-1";
       let currentOrientation = "normal";
       let currentFbRotate = 0;
 
-      // Step 2: read file if it exists
+      // read existing file if present
       if (fs.existsSync(path)) {
          try {
             const data = fs.readFileSync(path, "utf8");
             const lines = data.split("\n");
-
             lines.forEach(line => {
                if (/^set screen=/.test(line)) {
                   const m = line.match(/video=(.*),panel_orientation=(.*)/);
@@ -278,25 +282,54 @@ vkiosksettings.prototype.writeRotationConfig = function (screen, orientation, fb
          }
       }
 
-      // Step 3: override with new values only if defined
+      // override if new values are given
       if (screen !== undefined) currentScreen = screen;
       if (orientation !== undefined) currentOrientation = orientation;
       if (fbRotate !== undefined) currentFbRotate = fbRotate;
 
-      // Step 4: write the file
-      const content = [
-         `set screen=video=${currentScreen},panel_orientation=${currentOrientation}`,
-         `set efifb=video=efifb`,
-         `set fbcon=rotate:${currentFbRotate}`
-      ].join("\n") + "\n";
+      // build new content
+      const content =
+         `set screen=video=${currentScreen},panel_orientation=${currentOrientation}\n` +
+         `set video=efifb\n` +
+         `set fbcon=rotate:${currentFbRotate}\n`;
 
-      fs.writeFile(path, content, "utf8", (err) => {
-         if (err) {
-            self.logger.error(logPrefix + " Failed to write rotation file: " + err);
-            return reject(err);
+      // run sudo tee
+      const child = spawn("sudo", ["tee", path], { stdio: ["pipe", "ignore", "pipe"] });
+
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk.toString(); });
+
+      child.on("close", code => {
+         if (code !== 0) {
+            self.logger.error(logPrefix + " tee exited with code " + code + " stderr: " + stderr.trim());
+            return reject(new Error(stderr.trim() || `tee exit ${code}`));
          }
-         self.logger.info(
-            logPrefix + ` Rotation config saved: screen=${currentScreen}, orientation=${currentOrientation}, fbcon=${currentFbRotate}`
+         self.logger.info(logPrefix + ` Rotation config saved: screen=${currentScreen}, orientation=${currentOrientation}, fbcon=${currentFbRotate}`);
+         resolve();
+      });
+
+      child.stdin.write(content);
+      child.stdin.end();
+   });
+};
+
+
+vkiosksettings.prototype.removeRotationConfig = function () {
+   const self = this;
+   const path = "/boot/boot_screen_rotation.cfg";
+
+   return new Promise((resolve, reject) => {
+      const cmd = `echo volumio | sudo -S rm -f ${path}`;
+      exec(cmd, (error, stdout, stderr) => {
+         if (error) {
+            self.logger.error(logPrefix + ` Failed to remove rotation config: ${stderr || error.message}`);
+            return reject(error);
+         }
+         self.logger.info(logPrefix + ` Rotation config removed: ${path}`);
+           self.commandRouter.pushToastMessage(
+            'error',
+            'Plugin stopped!!!',
+            'Please Reboot now!.'
          );
          resolve();
       });
