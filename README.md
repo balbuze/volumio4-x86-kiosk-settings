@@ -11,5 +11,5 @@ git pull
 ```
 To install
 ```
-cd ./volumio4-x86-kiosk-settings/vkiosksettings
+cd ./volumio4-x86-kiosk-settings/display_configuration
 volumio plugin install
