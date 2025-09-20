@@ -289,9 +289,9 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
 
       // build new content
       const content =
-         `set screen=video=${currentScreen},panel_orientation=${currentOrientation}\n` +
-         `set video=efifb\n` +
-         `set fbcon=rotate:${currentFbRotate}\n`;
+         `set screen=video=${currentScreen}:panel_orientation=${currentOrientation}\n` +
+         `set efifb=video=efifb\n` +
+         `set fbcon=fbcon=rotate:${currentFbRotate}\n`;
 
       // run sudo tee
       const child = spawn("sudo", ["tee", path], { stdio: ["pipe", "ignore", "pipe"] });
