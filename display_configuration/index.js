@@ -255,56 +255,29 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
    const path = "/boot/boot_screen_rotation.cfg";
 
    return new Promise((resolve, reject) => {
-      // defaults
-      let currentScreen = "DSI-1";
-      let currentOrientation = "normal";
-      let currentFbRotate = 0;
-
-      // read existing file if present
-      if (fs.existsSync(path)) {
-         try {
-            const data = fs.readFileSync(path, "utf8");
-            const lines = data.split("\n");
-            lines.forEach(line => {
-               if (/^set screen=/.test(line)) {
-                  const m = line.match(/video=(.*),panel_orientation=(.*)/);
-                  if (m) {
-                     currentScreen = m[1];
-                     currentOrientation = m[2];
-                  }
-               } else if (/^set fbcon=/.test(line)) {
-                  const m = line.match(/rotate:(\d+)/);
-                  if (m) currentFbRotate = m[1];
-               }
-            });
-         } catch (err) {
-            self.logger.warn(logPrefix + " Could not parse existing rotation.conf: " + err);
-         }
-      }
-
-      // override if new values are given
-      if (screen !== undefined) currentScreen = screen;
-      if (orientation !== undefined) currentOrientation = orientation;
-      if (fbRotate !== undefined) currentFbRotate = fbRotate;
-
-      // build new content
+      // Always overwrite with the new values
       const content =
-         `set screen=video=${currentScreen}:panel_orientation=${currentOrientation}\n` +
+         `set screen=video=${screen}:panel_orientation=${orientation}\n` +
          `set efifb=video=efifb\n` +
-         `set fbcon=fbcon=rotate:${currentFbRotate}\n`;
+         `set fbcon=fbcon=rotate:${fbRotate}\n`;
 
-      // run sudo tee
+      // Use sudo tee to write file (since /boot is protected)
       const child = spawn("sudo", ["tee", path], { stdio: ["pipe", "ignore", "pipe"] });
 
       let stderr = "";
-      child.stderr.on("data", chunk => { stderr += chunk.toString(); });
+      child.stderr.on("data", chunk => {
+         stderr += chunk.toString();
+      });
 
       child.on("close", code => {
          if (code !== 0) {
-            self.logger.error(logPrefix + " tee exited with code " + code + " stderr: " + stderr.trim());
+            self.logger.error(logPrefix + ` tee exited with code ${code} stderr: ${stderr.trim()}`);
             return reject(new Error(stderr.trim() || `tee exit ${code}`));
          }
-         self.logger.info(logPrefix + ` Rotation config saved: screen=${currentScreen}, orientation=${currentOrientation}, fbcon=${currentFbRotate}`);
+         self.logger.info(
+            logPrefix +
+            ` Rotation config saved: screen=${screen}, orientation=${orientation}, fbcon=${fbRotate}`
+         );
          resolve();
       });
 
@@ -312,6 +285,7 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
       child.stdin.end();
    });
 };
+
 
 
 display_configuration.prototype.removeRotationConfig = function () {
@@ -326,7 +300,7 @@ display_configuration.prototype.removeRotationConfig = function () {
             return reject(error);
          }
          self.logger.info(logPrefix + ` Rotation config removed: ${path}`);
-           self.commandRouter.pushToastMessage(
+         self.commandRouter.pushToastMessage(
             'error',
             'Plugin stopped!!!',
             'Please Reboot now!.'
@@ -680,11 +654,12 @@ display_configuration.prototype.savescreensettings = function (data) {
 
    var brightness = (data['brightness']);
    //      self.logger.error(logPrefix + " setBrightness error: " + brightness);
+   const [rotation, fbconv, po] = data['rotatescreen'].value.split(":");
 
    self.config.set('rotatescreen', {
-      value: data['rotatescreen'].value,
-      po: data['rotatescreen'].po,
-      fbconv: data['rotatescreen'].fbconv,
+      value: rotation,
+      fbconv: fbconv,
+      po: po,
       label: data['rotatescreen'].label
    });
 
@@ -766,7 +741,7 @@ display_configuration.prototype.savescreensettings = function (data) {
       } catch (err) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   }, 1000);
+   }, 2000);
 
 };
 
@@ -822,9 +797,22 @@ display_configuration.prototype.detectTouchscreen = function () {
 display_configuration.prototype.applyRotation = async function () {
    const self = this;
    const display = self.getDisplaynumber();
-   const rotatescreen = self.config.get("rotatescreen").value;
-   const fbconv = self.config.get("rotatescreen").fbconv;
-   const orientation = self.config.get("rotatescreen").po;
+
+   const rotateConf = self.config.get("rotatescreen") || {};
+   const rotatescreen = rotateConf.value || "normal";
+
+   // fallback mapping if fields are missing
+   const rotationMap = {
+      normal:   { fbconv: 0, po: "normal" },
+      inverted: { fbconv: 2, po: "upside_down" },
+      right:    { fbconv: 1, po: "right_side_up" },
+      left:     { fbconv: 3, po: "left_side_up" }
+   };
+
+   const map = rotationMap[rotatescreen] || rotationMap["normal"];
+
+   const fbconv = rotateConf.fbconv !== undefined ? rotateConf.fbconv : map.fbconv;
+   const orientation = rotateConf.po || map.po;
 
    const screen = await self.detectConnectedScreen();
 
@@ -833,6 +821,7 @@ display_configuration.prototype.applyRotation = async function () {
    } catch (err) {
       self.logger.error(logPrefix + " applyRotation grub error: " + err);
    }
+
    try {
       const screen = await self.detectConnectedScreen();
       if (!screen) {
@@ -840,11 +829,12 @@ display_configuration.prototype.applyRotation = async function () {
          return;
       }
       exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${rotatescreen}`);
-      self.logger.info(logPrefix + ` Rotation applied: ${rotatescreen}`);
+      self.logger.info(logPrefix + ` Rotation applied: ${rotatescreen} (po=${orientation}, fbconv=${fbconv})`);
    } catch (err) {
       self.logger.error(logPrefix + " applyRotation error: " + err);
    }
 };
+
 
 display_configuration.prototype.applyTouchCorrection = async function () {
    const self = this;

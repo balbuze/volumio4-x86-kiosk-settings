@@ -1,6 +1,6 @@
 {
   "name": "display_configuration",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
       "bookworm"
     ],
     "details": "Display configuration for Volumio x86",
-    "changelog": "name change"
+    "changelog": "grub fix"
   },
   "engines": {
     "node": ">=20",
