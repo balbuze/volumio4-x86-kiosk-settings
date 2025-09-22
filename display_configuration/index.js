@@ -62,7 +62,7 @@ display_configuration.prototype.onStart = function () {
       const display = self.getDisplaynumber();
       await self.applyscreensettings();
       self.monitorLid(); // start monitoring lid events
-   }, 2000);
+   }, 500);
 
    defer.resolve();
    return defer.promise;
@@ -741,7 +741,7 @@ display_configuration.prototype.savescreensettings = function (data) {
       } catch (err) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   }, 2000);
+   }, 500);
 
 };
 
