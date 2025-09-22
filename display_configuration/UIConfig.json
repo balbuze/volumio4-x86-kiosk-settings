@@ -130,7 +130,7 @@
           "label": "TRANSLATE.XSCREEN_SAVER_SETTING",
           "onClick": {
             "type": "plugin",
-            "endpoint": "user_interface/vkiosksettings",
+            "endpoint": "user_interface/display_configuration",
             "method": "xscreensettings"
           },
           "visibleIf": {
