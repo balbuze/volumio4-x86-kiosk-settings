@@ -12,7 +12,8 @@ var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 const io = require('socket.io-client');
 const path = require("path");
-const logPrefix = "Display-configuration --- "
+const boot_screen_rotation = "/boot/boot_screen_rotation.cfg";
+const logPrefix = "Display-configuration --- ";
 // Define the display_configuration class
 module.exports = display_configuration;
 
@@ -62,7 +63,7 @@ display_configuration.prototype.onStart = function () {
       const display = self.getDisplaynumber();
       await self.applyscreensettings();
       self.monitorLid(); // start monitoring lid events
-   }, 500);
+   }, 100);
 
    defer.resolve();
    return defer.promise;
@@ -252,7 +253,6 @@ display_configuration.prototype.detectConnectedScreen = function () {
 
 display_configuration.prototype.writeRotationConfig = function (screen, orientation, fbRotate) {
    const self = this;
-   const path = "/boot/boot_screen_rotation.cfg";
 
    return new Promise((resolve, reject) => {
       // Always overwrite with the new values
@@ -262,7 +262,7 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
          `set fbcon=fbcon=rotate:${fbRotate}\n`;
 
       // Use sudo tee to write file (since /boot is protected)
-      const child = spawn("sudo", ["tee", path], { stdio: ["pipe", "ignore", "pipe"] });
+      const child = spawn("sudo", ["tee", boot_screen_rotation], { stdio: ["pipe", "ignore", "pipe"] });
 
       let stderr = "";
       child.stderr.on("data", chunk => {
@@ -290,16 +290,15 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
 
 display_configuration.prototype.removeRotationConfig = function () {
    const self = this;
-   const path = "/boot/boot_screen_rotation.cfg";
 
    return new Promise((resolve, reject) => {
-      const cmd = `echo volumio | sudo -S rm -f ${path}`;
+      const cmd = `echo volumio | sudo -S rm -f ${boot_screen_rotation}`;
       exec(cmd, (error, stdout, stderr) => {
          if (error) {
             self.logger.error(logPrefix + ` Failed to remove rotation config: ${stderr || error.message}`);
             return reject(error);
          }
-         self.logger.info(logPrefix + ` Rotation config removed: ${path}`);
+         self.logger.info(logPrefix + ` Rotation config removed: ${boot_screen_rotation}`);
          self.commandRouter.pushToastMessage(
             'error',
             'Plugin stopped!!!',
@@ -741,7 +740,7 @@ display_configuration.prototype.savescreensettings = function (data) {
       } catch (err) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
-   }, 500);
+   }, 100);
 
 };
 
