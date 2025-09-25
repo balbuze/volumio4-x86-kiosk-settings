@@ -12,7 +12,7 @@ var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 const io = require('socket.io-client');
 const path = require("path");
-const boot_screen_rotation = "/boot/boot_screen_rotation.cfg";
+const boot_screen_rotation = "/data/plugin/volumio4-x86-kiosk-settings/display_configuration/rotation.cfg";
 const logPrefix = "Display-configuration --- ";
 // Define the display_configuration class
 module.exports = display_configuration;
