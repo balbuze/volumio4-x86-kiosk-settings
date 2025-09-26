@@ -12,7 +12,7 @@ var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 const io = require('socket.io-client');
 const path = require("path");
-const boot_screen_rotation = "/data/plugin/volumio4-x86-kiosk-settings/display_configuration/rotation.cfg";
+const boot_screen_rotation = "/data/plugins/user_interface/display_configuration/rotation.cfg";
 const logPrefix = "Display-configuration --- ";
 // Define the display_configuration class
 module.exports = display_configuration;
@@ -250,19 +250,18 @@ display_configuration.prototype.detectConnectedScreen = function () {
    });
 };
 
-
 display_configuration.prototype.writeRotationConfig = function (screen, orientation, fbRotate) {
    const self = this;
 
    return new Promise((resolve, reject) => {
       // Always overwrite with the new values
       const content =
-         `set screen=video=${screen}:panel_orientation=${orientation}\n` +
+         `set screen=video=${screen},panel_orientation=${orientation}\n` +
          `set efifb=video=efifb\n` +
-         `set fbcon=fbcon=rotate:${fbRotate}\n`;
+         `set fbcon=rotate:${fbRotate}\n`;
 
-      // Use sudo tee to write file (since /boot is protected)
-      const child = spawn("sudo", ["tee", boot_screen_rotation], { stdio: ["pipe", "ignore", "pipe"] });
+      // Spawn tee to write into the file
+      const child = spawn("tee", [boot_screen_rotation], { stdio: ["pipe", "ignore", "pipe"] });
 
       let stderr = "";
       child.stderr.on("data", chunk => {
@@ -281,28 +280,31 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
          resolve();
       });
 
+      // send the content into tee's stdin
       child.stdin.write(content);
       child.stdin.end();
    });
 };
 
-
-
 display_configuration.prototype.removeRotationConfig = function () {
    const self = this;
 
    return new Promise((resolve, reject) => {
-      const cmd = `echo volumio | sudo -S rm -f ${boot_screen_rotation}`;
-      exec(cmd, (error, stdout, stderr) => {
-         if (error) {
-            self.logger.error(logPrefix + ` Failed to remove rotation config: ${stderr || error.message}`);
-            return reject(error);
+      fs.unlink(boot_screen_rotation, (err) => {
+         if (err) {
+            if (err.code === "ENOENT") {
+               self.logger.warn(logPrefix + ` Rotation config not found: ${boot_screen_rotation}`);
+               return resolve();
+            }
+            self.logger.error(logPrefix + ` Failed to remove rotation config: ${err.message}`);
+            return reject(err);
          }
+
          self.logger.info(logPrefix + ` Rotation config removed: ${boot_screen_rotation}`);
          self.commandRouter.pushToastMessage(
-            'error',
-            'Plugin stopped!!!',
-            'Please Reboot now!.'
+            "error",
+            "Plugin stopped!!!",
+            "Please Reboot now!."
          );
          resolve();
       });
