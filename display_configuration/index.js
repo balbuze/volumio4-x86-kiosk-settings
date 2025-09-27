@@ -256,7 +256,7 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
    return new Promise((resolve, reject) => {
       // Always overwrite with the new values
       const content =
-         `set screen=video=${screen},panel_orientation=${orientation}\n` +
+         `set screen=video=${screen}:panel_orientation=${orientation}\n` +
          `set efifb=video=efifb\n` +
          `set fbcon=rotate:${fbRotate}\n`;
 

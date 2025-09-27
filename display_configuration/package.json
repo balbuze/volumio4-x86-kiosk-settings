@@ -1,6 +1,6 @@
 {
   "name": "display_configuration",
-  "version": "0.0.26",
+  "version": "0.0.27",
   "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {
@@ -24,7 +24,7 @@
   },
   "engines": {
     "node": ">=20",
-    "volumio": ">=4.025"
+    "volumio": ">=4"
   },
   "dependencies": {
     "fs-extra": "*",
