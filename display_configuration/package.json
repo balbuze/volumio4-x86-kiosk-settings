@@ -1,6 +1,6 @@
 {
   "name": "display_configuration",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "description": "Configure the local display, touchscreen, screensaver...",
   "main": "index.js",
   "scripts": {

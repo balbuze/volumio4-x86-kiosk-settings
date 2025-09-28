@@ -818,8 +818,8 @@ display_configuration.prototype.detectTouchscreen = function () {
 
          // Match all possible touchscreen candidates
          const matches = lines.filter(line =>
-            /touch|touchscreen|finger|multitouch|stylus|goodix|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
-            && !/pen|digitizer|mouse|keyboard/i.test(line)  // exclude stylus/pen
+            /touch|touchscreen|finger|multitouch|stylus|goodix|synp|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
+            && !/mouse|keyboard/i.test(line)  // skip obvious non-touch devices
          );
 
          if (matches.length === 0) {
@@ -827,18 +827,26 @@ display_configuration.prototype.detectTouchscreen = function () {
          }
 
          // Extract IDs and names
-         const devices = matches.map(line => {
+         let devices = matches.map(line => {
             const idMatch = line.match(/id=(\d+)/);
             const id = idMatch ? idMatch[1] : null;
             const name = line.replace(/\s*id=\d+.*/, "").trim();
             return { id, name };
          }).filter(dev => dev.id);
 
-         self.logger.info(logPrefix + " Touch devices detected: " + JSON.stringify(devices));
-         resolve(devices);
+         // Prefer real "touch" devices over stylus/digitizers
+         const preferred = devices.find(dev =>
+            /touch|touchscreen|finger|multitouch/i.test(dev.name)
+         );
+
+         const chosen = preferred || devices[0]; // fallback to first one
+
+         self.logger.info(logPrefix + " Touch device chosen: " + JSON.stringify(chosen));
+         resolve([chosen]); // return array with just one (for applyTouchCorrection)
       });
    });
 };
+
 
 
 /**
@@ -921,41 +929,42 @@ display_configuration.prototype.applyTouchCorrection = async function () {
          return;
       }
 
-      for (let dev of touchDevices) {
-         try {
-            if (touchcorrection === "automatic") {
-               // Automatic: map to detected screen output
-               await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
-               self.logger.info(
-                  logPrefix + ` Automatic mapping: ${dev.name} (id=${dev.id}) → ${screen}`
-               );
-            } else {
-               // Manual matrix correction
-               let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
-               switch (touchcorrection) {
-                  case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
-                  case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
-                  case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
-                  case "none": default: break;
-               }
+      // Only pick the first detected touchscreen
+      const dev = touchDevices[0];
 
-               await runCommand(
-                  `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
-               );
-               self.logger.info(
-                  logPrefix + ` Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
-               );
+      try {
+         if (touchcorrection === "automatic") {
+            // Automatic: map to detected screen output
+            await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
+            self.logger.info(
+               logPrefix + ` Automatic mapping: ${dev.name} (id=${dev.id}) → ${screen}`
+            );
+         } else {
+            // Manual matrix correction
+            let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
+            switch (touchcorrection) {
+               case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
+               case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
+               case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
+               case "none": default: break;
             }
-         } catch (err) {
-            if (/property|failed/i.test(err.message)) {
-               self.logger.warn(
-                  logPrefix + ` ${dev.name} (id=${dev.id}) does not support matrix transform`
-               );
-            } else {
-               self.logger.error(
-                  logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
-               );
-            }
+
+            await runCommand(
+               `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
+            );
+            self.logger.info(
+               logPrefix + ` Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
+            );
+         }
+      } catch (err) {
+         if (/property|failed/i.test(err.message)) {
+            self.logger.warn(
+               logPrefix + ` ${dev.name} (id=${dev.id}) does not support matrix transform`
+            );
+         } else {
+            self.logger.error(
+               logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
+            );
          }
       }
    } catch (err) {
