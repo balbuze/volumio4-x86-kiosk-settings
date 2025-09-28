@@ -816,14 +816,14 @@ display_configuration.prototype.detectTouchscreen = function () {
 
          const lines = stdout.split("\n");
 
-         // Match all possible touch input types
+         // Match all possible touchscreen candidates
          const matches = lines.filter(line =>
-             /touch|touchscreen|finger|multitouch|goodix|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
-               && !/stylus|pen|mouse|keyboard/i.test(line)
+            /touch|touchscreen|finger|multitouch|stylus|goodix|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
+            && !/pen|digitizer|mouse|keyboard/i.test(line)  // exclude stylus/pen
          );
 
          if (matches.length === 0) {
-            return resolve([]); // no touch-like devices
+            return resolve([]); // none found
          }
 
          // Extract IDs and names
@@ -832,14 +832,14 @@ display_configuration.prototype.detectTouchscreen = function () {
             const id = idMatch ? idMatch[1] : null;
             const name = line.replace(/\s*id=\d+.*/, "").trim();
             return { id, name };
-         }).filter(dev => dev.id); // keep only valid ones
+         }).filter(dev => dev.id);
 
          self.logger.info(logPrefix + " Touch devices detected: " + JSON.stringify(devices));
-
-         resolve(devices); // return all devices (array of {id, name})
+         resolve(devices);
       });
    });
 };
+
 
 /**
  * Helper: find device id from xinput by name
@@ -898,15 +898,14 @@ display_configuration.prototype.applyRotation = async function () {
    }
 };
 
+// 2. rotate touchsscreenn
 display_configuration.prototype.applyTouchCorrection = async function () {
    const self = this;
    const display = self.getDisplaynumber();
    const screen = await self.detectConnectedScreen();
-
-   // const output = self.config.get("output").value; // e.g. eDP-1 or HDMI-1
    const touchcorrection = self.config.get("touchcorrection").value;
 
-   // Inline runCommand helper
+   // Inline helper
    const runCommand = (cmd) =>
       new Promise((resolve, reject) => {
          exec(cmd, (error, stdout, stderr) => {
@@ -925,27 +924,37 @@ display_configuration.prototype.applyTouchCorrection = async function () {
       for (let dev of touchDevices) {
          try {
             if (touchcorrection === "automatic") {
+               // Automatic: map to detected screen output
                await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
-               self.logger.info(logPrefix + ` ---------------Automatic Touchscreen ${dev.name} (id=${dev.id}) mapped to ${screen}`);
+               self.logger.info(
+                  logPrefix + ` Automatic mapping: ${dev.name} (id=${dev.id}) → ${screen}`
+               );
             } else {
-               let matrix = "1 0 0  0 1 0  0 0 1"; // normal by default
+               // Manual matrix correction
+               let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
                switch (touchcorrection) {
                   case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
                   case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
                   case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
-                  case "none": default: break; // keep identity matrix
+                  case "none": default: break;
                }
 
                await runCommand(
                   `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
                );
-               self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection} to ${dev.name} (id=${dev.id})`);
+               self.logger.info(
+                  logPrefix + ` Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
+               );
             }
          } catch (err) {
             if (/property|failed/i.test(err.message)) {
-               self.logger.warn(logPrefix + ` Touch device ${dev.name} (id=${dev.id}) does not support matrix transform`);
+               self.logger.warn(
+                  logPrefix + ` ${dev.name} (id=${dev.id}) does not support matrix transform`
+               );
             } else {
-               self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`);
+               self.logger.error(
+                  logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
+               );
             }
          }
       }
@@ -953,9 +962,6 @@ display_configuration.prototype.applyTouchCorrection = async function () {
       self.logger.error(logPrefix + " applyTouchCorrection error: " + err.message);
    }
 };
-
-
-
 
 // 3. Handle cursor hiding
 display_configuration.prototype.applyCursorSetting = function () {
