@@ -648,6 +648,54 @@ display_configuration.prototype.setBrightness = function () {
       self.logger.error(logPrefix + " setBrightness error: " + err);
    }
 };
+/*
+//not use yet!!!!
+display.prototype.setHwBrightness = function (percent) {
+   const self = this;
+   const backlightDir = "/sys/class/backlight";
+
+   return new Promise((resolve, reject) => {
+      fs.readdir(backlightDir, (err, devices) => {
+         if (err || !devices || devices.length === 0) {
+            self.logger.warn(logPrefix + " No backlight device found, brightness control unavailable.");
+            return resolve(false);
+         }
+
+         // Pick the first device (can extend to handle multiple)
+         const device = devices[0];
+         const maxPath = path.join(backlightDir, device, "max_brightness");
+         const curPath = path.join(backlightDir, device, "brightness");
+
+         fs.readFile(maxPath, "utf8", (err, data) => {
+            if (err) {
+               self.logger.error(logPrefix + " Failed to read max_brightness: " + err);
+               return reject(err);
+            }
+
+            const maxBrightness = parseInt(data.trim(), 10);
+            if (isNaN(maxBrightness) || maxBrightness <= 0) {
+               self.logger.error(logPrefix + " Invalid max_brightness value");
+               return reject(new Error("Invalid max_brightness"));
+            }
+
+            // Clamp percent
+            let pct = Math.max(0, Math.min(100, parseInt(percent, 10)));
+            const newValue = Math.round((pct / 100) * maxBrightness);
+
+            exec(`echo ${newValue} | sudo tee ${curPath}`, (error, stdout, stderr) => {
+               if (error) {
+                  self.logger.error(logPrefix + " Failed to set brightness: " + stderr || error.message);
+                  return reject(error);
+               }
+
+               self.logger.info(logPrefix + ` Brightness set to ${pct}% (${newValue}/${maxBrightness}) on ${device}`);
+               resolve(true);
+            });
+         });
+      });
+   });
+};
+*/
 
 
 display_configuration.prototype.savescreensettings = function (data) {
@@ -770,7 +818,8 @@ display_configuration.prototype.detectTouchscreen = function () {
 
          // Match all possible touch input types
          const matches = lines.filter(line =>
-            /(touchscreen|touch|finger|multitouch|pen|stylus)/i.test(line)
+             /touch|touchscreen|finger|multitouch|goodix|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
+               && !/stylus|pen|mouse|keyboard/i.test(line)
          );
 
          if (matches.length === 0) {
@@ -792,6 +841,19 @@ display_configuration.prototype.detectTouchscreen = function () {
    });
 };
 
+/**
+ * Helper: find device id from xinput by name
+ */
+display_configuration.prototype.getDeviceId = async function (deviceName) {
+   try {
+      const { stdout } = await execAsync(`xinput list | grep -F '${deviceName}'`);
+      const match = stdout.match(/id=(\d+)/);
+      return match ? match[1] : null;
+   } catch {
+      return null;
+   }
+};
+
 
 
 // 1. Rotate screen
@@ -804,10 +866,10 @@ display_configuration.prototype.applyRotation = async function () {
 
    // fallback mapping if fields are missing
    const rotationMap = {
-      normal:   { fbconv: 0, po: "normal" },
+      normal: { fbconv: 0, po: "normal" },
       inverted: { fbconv: 2, po: "upside_down" },
-      right:    { fbconv: 1, po: "right_side_up" },
-      left:     { fbconv: 3, po: "left_side_up" }
+      right: { fbconv: 1, po: "right_side_up" },
+      left: { fbconv: 3, po: "left_side_up" }
    };
 
    const map = rotationMap[rotatescreen] || rotationMap["normal"];
@@ -836,12 +898,22 @@ display_configuration.prototype.applyRotation = async function () {
    }
 };
 
-
 display_configuration.prototype.applyTouchCorrection = async function () {
    const self = this;
    const display = self.getDisplaynumber();
+   const screen = await self.detectConnectedScreen();
+
+   // const output = self.config.get("output").value; // e.g. eDP-1 or HDMI-1
    const touchcorrection = self.config.get("touchcorrection").value;
 
+   // Inline runCommand helper
+   const runCommand = (cmd) =>
+      new Promise((resolve, reject) => {
+         exec(cmd, (error, stdout, stderr) => {
+            if (error) return reject(new Error(stderr || error.message));
+            resolve(stdout);
+         });
+      });
 
    try {
       const touchDevices = await self.detectTouchscreen();
@@ -850,31 +922,39 @@ display_configuration.prototype.applyTouchCorrection = async function () {
          return;
       }
 
-      let matrix = "1 0 0  0 1 0  0 0 1";
-      switch (touchcorrection) {
-         case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
-         case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
-         case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
-      }
-
       for (let dev of touchDevices) {
-         exec(`DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`,
-            (error, stdout, stderr) => {
-               if (error) {
-                  if (stderr.includes("property") || stderr.includes("failed")) {
-                     self.logger.warn(logPrefix + ` Touch device ${dev.name} (id=${dev.id}) does not support matrix transform`);
-                  } else {
-                     self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${error.message}`);
-                  }
-               } else {
-                  self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection} to ${dev.name} (id=${dev.id})`);
+         try {
+            if (touchcorrection === "automatic") {
+               await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
+               self.logger.info(logPrefix + ` ---------------Automatic Touchscreen ${dev.name} (id=${dev.id}) mapped to ${screen}`);
+            } else {
+               let matrix = "1 0 0  0 1 0  0 0 1"; // normal by default
+               switch (touchcorrection) {
+                  case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
+                  case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
+                  case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
+                  case "none": default: break; // keep identity matrix
                }
-            });
+
+               await runCommand(
+                  `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
+               );
+               self.logger.info(logPrefix + ` Touch correction applied: ${touchcorrection} to ${dev.name} (id=${dev.id})`);
+            }
+         } catch (err) {
+            if (/property|failed/i.test(err.message)) {
+               self.logger.warn(logPrefix + ` Touch device ${dev.name} (id=${dev.id}) does not support matrix transform`);
+            } else {
+               self.logger.error(logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`);
+            }
+         }
       }
    } catch (err) {
-      self.logger.error(logPrefix + " applyTouchCorrection error: " + err);
+      self.logger.error(logPrefix + " applyTouchCorrection error: " + err.message);
    }
 };
+
+
 
 
 // 3. Handle cursor hiding
