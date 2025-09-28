@@ -819,7 +819,7 @@ display_configuration.prototype.detectTouchscreen = function () {
          // Match all possible touchscreen candidates
          const matches = lines.filter(line =>
             /touch|touchscreen|finger|multitouch|stylus|goodix|synp|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
-            && !/mouse|keyboard/i.test(line)  // skip obvious non-touch devices
+            && !/mouse|touchpad|keyboard/i.test(line)  // skip obvious non-touch devices
          );
 
          if (matches.length === 0) {
