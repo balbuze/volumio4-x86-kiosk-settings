@@ -621,7 +621,7 @@ display_configuration.prototype.xscreensettings = function (data) {
 };
 
 
-display_configuration.prototype.setBrightness = function () {
+display_configuration.prototype.setBrightnessSoft = function () {
    const self = this;
    const display = self.getDisplaynumber();
    var value = self.config.get('brightness')
@@ -648,16 +648,21 @@ display_configuration.prototype.setBrightness = function () {
       self.logger.error(logPrefix + " setBrightness error: " + err);
    }
 };
-/*
-//not use yet!!!!
-display.prototype.setHwBrightness = function (percent) {
+
+//not use yet!!!! Needs to set backlight=native in grub.cfg
+display_configuration.prototype.setBrightness = function () {
+
    const self = this;
    const backlightDir = "/sys/class/backlight";
+   var percent = self.config.get('brightness') * 100
+   //     self.logger.warn(logPrefix + " percent "+percent);
+
 
    return new Promise((resolve, reject) => {
       fs.readdir(backlightDir, (err, devices) => {
          if (err || !devices || devices.length === 0) {
-            self.logger.warn(logPrefix + " No backlight device found, brightness control unavailable.");
+            self.logger.warn(logPrefix + " No backlight device found, brightness control unavailable. Falling back to Soft Brightness");
+            self.setBrightnessSoft();
             return resolve(false);
          }
 
@@ -695,7 +700,7 @@ display.prototype.setHwBrightness = function (percent) {
       });
    });
 };
-*/
+
 
 
 display_configuration.prototype.savescreensettings = function (data) {
