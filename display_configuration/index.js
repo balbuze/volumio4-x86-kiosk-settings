@@ -61,7 +61,7 @@ display_configuration.prototype.onStart = function () {
    setTimeout(async function () {
       self.checkIfPlay();
       const display = self.getDisplaynumber();
-      await self.applyscreensettings();
+      await self.applyscreensettingsboot();
       self.monitorLid(); // start monitoring lid events
    }, 100);
 
@@ -275,7 +275,7 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
          }
          self.logger.info(
             logPrefix +
-            ` Rotation config saved: screen=${screen}, orientation=${orientation}, fbcon=${fbRotate}`
+            ` Rotation config saved for Grub: screen=${screen}, orientation=${orientation}, fbcon=${fbRotate}`
          );
          resolve();
       });
@@ -640,7 +640,7 @@ display_configuration.prototype.setBrightnessSoft = function () {
             if (err) {
                self.logger.error(logPrefix + " Failed to set brightness: " + err);
             } else {
-               self.logger.info(logPrefix + ` Brightness set to ${brightness} for screen ${screen}`);
+               self.logger.info(logPrefix + ` Brightness set to ${brightness * 100}% for screen ${screen}`);
             }
          });
       });
@@ -751,9 +751,10 @@ display_configuration.prototype.savescreensettings = function (data) {
          );
       } else {
          self.commandRouter.pushToastMessage(
-            'success',
-            ' ✅ Screen settings applied'
+            "warn",
+            "Settings applied!"
          );
+
       }
       self.config.set('timeout', timeout);
    }
@@ -796,6 +797,38 @@ display_configuration.prototype.savescreensettings = function (data) {
          self.logger.error(logPrefix + " Failed to apply screensaver immediately: " + err);
       }
    }, 100);
+
+};
+
+
+display_configuration.prototype.applyscreensettingsboot = async function () {
+   const self = this;
+
+   const dmesgOutput = await new Promise((resolve) => {
+      exec("dmesg | grep drm", (error, stdout, stderr) => {
+         if (error) return resolve("");
+         resolve(stdout);
+      });
+   });
+
+   const forcedOrientation = dmesgOutput.split("\n").find(line =>
+      /\[drm\].*panel_orientation to 1/.test(line)
+   );
+
+   if (forcedOrientation) {
+      self.logger.warn(
+         logPrefix + ` Kernel already forces orientation → skipping xrandr (line: "${forcedOrientation.trim()}")`
+      );
+   } else {
+      await this.applyRotation();
+
+      self.logger.info(
+         logPrefix + ` Pannel Rotation applied)`
+      );
+   }
+   await this.applyTouchCorrection();
+   this.applyCursorSetting();
+   self.setBrightness();
 
 };
 
@@ -867,8 +900,6 @@ display_configuration.prototype.getDeviceId = async function (deviceName) {
    }
 };
 
-
-
 // 1. Rotate screen
 display_configuration.prototype.applyRotation = async function () {
    const self = this;
@@ -886,30 +917,64 @@ display_configuration.prototype.applyRotation = async function () {
    };
 
    const map = rotationMap[rotatescreen] || rotationMap["normal"];
-
    const fbconv = rotateConf.fbconv !== undefined ? rotateConf.fbconv : map.fbconv;
-   const orientation = rotateConf.po || map.po;
+   const orientation = rotateConf.po || map.po;   // <-- always used for grub config
 
    const screen = await self.detectConnectedScreen();
 
+   // 🔎 Check kernel drm logs for forced orientation
+   const dmesgOutput = await new Promise((resolve) => {
+      exec("dmesg | grep drm", (error, stdout) => {
+         if (error) return resolve("");
+         resolve(stdout);
+      });
+   });
+   const drmLine = dmesgOutput.split("\n").find(line =>
+      /\[drm\].*panel_orientation to 1/.test(line)
+   );
+
+
+   // Default: runtime rotation same as config
+   let runtimeRotate = rotatescreen;
+
+   if (drmLine) {
+      // If kernel already forces orientation, flip the runtime xrandr direction
+      if (rotatescreen === "normal") {
+         runtimeRotate = "inverted";
+      } else if (rotatescreen === "left") {
+         runtimeRotate = "right";
+      } else if (rotatescreen === "right") {
+         runtimeRotate = "left";
+      } else if (rotatescreen === "inverted") {
+         runtimeRotate = "normal";
+      }
+
+      self.logger.warn(
+         logPrefix + ` Kernel forces orientation for ${screen} → adjusting runtime xrandr only (line: "${drmLine.trim()}")`
+      );
+   }
+
+   // Always update boot config with original orientation
    try {
       await this.writeRotationConfig(screen, orientation, fbconv);
    } catch (err) {
       self.logger.error(logPrefix + " applyRotation grub error: " + err);
    }
 
+   //  Apply runtime rotation (possibly adjusted if kernel forces one)
    try {
-      const screen = await self.detectConnectedScreen();
       if (!screen) {
          self.logger.error(logPrefix + " No connected screen detected, skipping rotation.");
          return;
       }
-      exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${rotatescreen}`);
-      self.logger.info(logPrefix + ` Rotation applied: ${rotatescreen} (po=${orientation}, fbconv=${fbconv})`);
+      exec(`DISPLAY=${display} xrandr --output ${screen} --rotate ${runtimeRotate}`);
+      self.logger.info(logPrefix + ` Runtime rotation applied: ${runtimeRotate} | Boot config (po=${orientation}, fbconv=${fbconv})`);
    } catch (err) {
       self.logger.error(logPrefix + " applyRotation error: " + err);
    }
 };
+
+
 
 // 2. rotate touchsscreenn
 display_configuration.prototype.applyTouchCorrection = async function () {
