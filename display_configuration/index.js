@@ -17,6 +17,7 @@ const logPrefix = "Display-configuration --- ";
 // Define the display_configuration class
 module.exports = display_configuration;
 
+
 function display_configuration(context) {
    var self = this;
    self.context = context;
@@ -330,6 +331,41 @@ display_configuration.prototype.fixXauthority = function () {
       });
    });
 };
+
+display_configuration.prototype.drmForcesOrientation = null;
+
+
+// Function to check and store
+display_configuration.prototype.checkDrmOrientation = async function (screen) {
+   const self = this;
+
+   try {
+      const dmesgOutput = await new Promise((resolve) => {
+         exec("dmesg | grep drm", (error, stdout) => {
+            if (error) return resolve("");
+            resolve(stdout);
+         });
+      });
+
+      const drmLine = dmesgOutput.split("\n").find(line =>
+         new RegExp(`\\[drm\\].*connector ${screen} panel_orientation to 1`).test(line)
+      );
+
+      self.drmForcesOrientation = !!drmLine; // store true/false
+      if (self.drmForcesOrientation) {
+         self.logger.info(logPrefix + ` Kernel forces orientation for ${screen} (line: "${drmLine.trim()}")`);
+      } else {
+         self.logger.info(logPrefix + ` No forced DRM orientation detected for ${screen}`);
+      }
+
+   } catch (err) {
+      self.logger.error(logPrefix + " checkDrmOrientation error: " + err.message);
+      self.drmForcesOrientation = false;
+   }
+
+   return self.drmForcesOrientation;
+};
+
 
 display_configuration.prototype.ensureXscreensaver = function () {
    const self = this;
@@ -751,7 +787,7 @@ display_configuration.prototype.savescreensettings = function (data) {
          );
       } else {
          self.commandRouter.pushToastMessage(
-            "warn",
+            "success",
             "Settings applied!"
          );
 
@@ -771,12 +807,6 @@ display_configuration.prototype.savescreensettings = function (data) {
       self.refreshUI();
       self.checkIfPlay();
       self.applyscreensettings();
-
-      // inside your applyRotation or savescreensettings
-
-
-      //await this.writeRotationConfig("HDMI-A-1", "normal", 0);
-      // or ("HDMI-A-1", "right", 1) depending on your case
 
       if (data['screensavertype'].value === 'dpms') {
          exec("pkill -f xscreensaver-settings || true");
@@ -804,33 +834,25 @@ display_configuration.prototype.savescreensettings = function (data) {
 display_configuration.prototype.applyscreensettingsboot = async function () {
    const self = this;
 
-   const dmesgOutput = await new Promise((resolve) => {
-      exec("dmesg | grep drm", (error, stdout, stderr) => {
-         if (error) return resolve("");
-         resolve(stdout);
-      });
-   });
+   // detect screen before using it
+   const screen = await this.detectConnectedScreen();
 
-   const forcedOrientation = dmesgOutput.split("\n").find(line =>
-      /\[drm\].*panel_orientation to 1/.test(line)
-   );
+   await this.checkDrmOrientation(screen);
 
-   if (forcedOrientation) {
+   if (this.drmForcesOrientation) {
       self.logger.warn(
-         logPrefix + ` Kernel already forces orientation → skipping xrandr (line: "${forcedOrientation.trim()}")`
+         logPrefix + ` Kernel already forces orientation → skipping xrandr`
       );
    } else {
       await this.applyRotation();
-
-      self.logger.info(
-         logPrefix + ` Pannel Rotation applied)`
-      );
+      self.logger.info(logPrefix + ` Panel Rotation applied`);
    }
+
    await this.applyTouchCorrection();
    this.applyCursorSetting();
    self.setBrightness();
-
 };
+
 
 display_configuration.prototype.applyscreensettings = async function () {
    const self = this;
@@ -841,6 +863,7 @@ display_configuration.prototype.applyscreensettings = async function () {
    self.setBrightness();
 
 };
+
 
 display_configuration.prototype.detectTouchscreen = function () {
    const self = this;
@@ -854,10 +877,9 @@ display_configuration.prototype.detectTouchscreen = function () {
 
          const lines = stdout.split("\n");
 
-         // Match all possible touchscreen candidates
+         // Match all possible touchscreen or touchpad candidates
          const matches = lines.filter(line =>
-            /touch|touchscreen|finger|multitouch|stylus|goodix|synp|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek/i.test(line)
-            && !/mouse|touchpad|keyboard/i.test(line)  // skip obvious non-touch devices
+            /touch|touchscreen|finger|multitouch|stylus|goodix|synp|elan|ft5406|maxtouch|wacom|ntrg|egalax|ilitek|touchpad|mouse/i.test(line)
          );
 
          if (matches.length === 0) {
@@ -865,27 +887,18 @@ display_configuration.prototype.detectTouchscreen = function () {
          }
 
          // Extract IDs and names
-         let devices = matches.map(line => {
+         const devices = matches.map(line => {
             const idMatch = line.match(/id=(\d+)/);
             const id = idMatch ? idMatch[1] : null;
             const name = line.replace(/\s*id=\d+.*/, "").trim();
             return { id, name };
          }).filter(dev => dev.id);
 
-         // Prefer real "touch" devices over stylus/digitizers
-         const preferred = devices.find(dev =>
-            /touch|touchscreen|finger|multitouch/i.test(dev.name)
-         );
-
-         const chosen = preferred || devices[0]; // fallback to first one
-
-         self.logger.info(logPrefix + " Touch device chosen: " + JSON.stringify(chosen));
-         resolve([chosen]); // return array with just one (for applyTouchCorrection)
+         self.logger.info(logPrefix + " Touch-related devices detected: " + JSON.stringify(devices));
+         resolve(devices); // return ALL devices
       });
    });
 };
-
-
 
 /**
  * Helper: find device id from xinput by name
@@ -922,22 +935,11 @@ display_configuration.prototype.applyRotation = async function () {
 
    const screen = await self.detectConnectedScreen();
 
-   // 🔎 Check kernel drm logs for forced orientation
-   const dmesgOutput = await new Promise((resolve) => {
-      exec("dmesg | grep drm", (error, stdout) => {
-         if (error) return resolve("");
-         resolve(stdout);
-      });
-   });
-   const drmLine = dmesgOutput.split("\n").find(line =>
-      /\[drm\].*panel_orientation to 1/.test(line)
-   );
-
-
-   // Default: runtime rotation same as config
+   //await this.checkDrmOrientation(screen);
    let runtimeRotate = rotatescreen;
 
-   if (drmLine) {
+   // 2. Later reuse the stored value
+   if (this.drmForcesOrientation) {
       // If kernel already forces orientation, flip the runtime xrandr direction
       if (rotatescreen === "normal") {
          runtimeRotate = "inverted";
@@ -950,7 +952,7 @@ display_configuration.prototype.applyRotation = async function () {
       }
 
       self.logger.warn(
-         logPrefix + ` Kernel forces orientation for ${screen} → adjusting runtime xrandr only (line: "${drmLine.trim()}")`
+         logPrefix + ` Kernel forces orientation for ${screen} → adjusting xrandr fake orientation`
       );
    }
 
@@ -999,48 +1001,48 @@ display_configuration.prototype.applyTouchCorrection = async function () {
          return;
       }
 
-      // Only pick the first detected touchscreen
-      const dev = touchDevices[0];
+      for (let dev of touchDevices) {
+         try {
+            if (touchcorrection === "automatic") {
+               // Automatic: map to detected screen output
+               await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
+               self.logger.info(
+                  `${logPrefix} Auto-mapped ${dev.name} (id=${dev.id}) → ${screen}`
+               );
+            } else {
+               // Manual matrix correction
+               let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
+               switch (touchcorrection) {
+                  case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
+                  case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
+                  case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
+                  case "none": default: break;
+               }
 
-      try {
-         if (touchcorrection === "automatic") {
-            // Automatic: map to detected screen output
-            await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
-            self.logger.info(
-               logPrefix + ` Automatic mapping: ${dev.name} (id=${dev.id}) → ${screen}`
-            );
-         } else {
-            // Manual matrix correction
-            let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
-            switch (touchcorrection) {
-               case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
-               case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
-               case "swap-both": matrix = "0 1 0  -1 0 1  0 0 1"; break;
-               case "none": default: break;
+               await runCommand(
+                  `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
+               );
+               self.logger.info(
+                  `${logPrefix} Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
+               );
             }
-
-            await runCommand(
-               `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
-            );
-            self.logger.info(
-               logPrefix + ` Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
-            );
-         }
-      } catch (err) {
-         if (/property|failed/i.test(err.message)) {
-            self.logger.warn(
-               logPrefix + ` ${dev.name} (id=${dev.id}) does not support matrix transform`
-            );
-         } else {
-            self.logger.error(
-               logPrefix + ` Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
-            );
+         } catch (err) {
+            if (/property|failed/i.test(err.message)) {
+               self.logger.warn(
+                  `${logPrefix} ${dev.name} (id=${dev.id}) does not support matrix transform`
+               );
+            } else {
+               self.logger.error(
+                  `${logPrefix} Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
+               );
+            }
          }
       }
    } catch (err) {
       self.logger.error(logPrefix + " applyTouchCorrection error: " + err.message);
    }
 };
+
 
 // 3. Handle cursor hiding
 display_configuration.prototype.applyCursorSetting = function () {
