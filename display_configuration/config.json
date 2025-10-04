@@ -9,8 +9,8 @@
     },
     "touchcorrection": {
         "value": {
-            "value": "none",
-            "label": "None"
+            "value": "automatic",
+            "label": "Automatic 🤖"
         }
     },
     "hidecursor": {

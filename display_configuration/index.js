@@ -976,6 +976,66 @@ display_configuration.prototype.applyRotation = async function () {
    }
 };
 
+// Run a shell command and return output
+function runCommand(cmd) {
+   return new Promise((resolve, reject) => {
+      exec(cmd, (error, stdout, stderr) => {
+         if (error) return reject(new Error(stderr || error.message));
+         resolve(stdout);
+      });
+   });
+}
+
+// Get screen resolution from xrandr
+async function getScreenGeometry(screen) {
+   try {
+      const output = await runCommand(`xrandr | grep "^${screen}"`);
+      const match = output.match(/(\d+)x(\d+)/);
+      if (match) {
+         return { width: parseInt(match[1], 10), height: parseInt(match[2], 10) };
+      }
+   } catch {
+      return { width: 0, height: 0 };
+   }
+   return { width: 0, height: 0 };
+}
+
+// Grab a single touch event (requires user tap)
+async function getSampleTouch(devId) {
+   try {
+      const cmd = `timeout 2 xinput test-xi2 ${devId} | grep -m1 "valuator"`;
+      const line = await runCommand(cmd);
+      const coords = line.match(/valuator\[0\]=([0-9.]+).*valuator\[1\]=([0-9.]+)/);
+      if (coords) {
+         return { x: parseFloat(coords[1]), y: parseFloat(coords[2]) };
+      }
+   } catch {
+      return null;
+   }
+   return null;
+}
+
+// Detect if touchscreen axes are inverted vs. screen
+display_configuration.prototype.detectTouchInversion = async function (devId, screen) {
+   const geom = await getScreenGeometry(screen);
+   const touch = await getSampleTouch(devId);
+
+   if (!geom.width || !geom.height || !touch) {
+      this.logger.warn(logPrefix + " Could not detect inversion (missing geometry or touch).");
+      return { invertX: false, invertY: false };
+   }
+
+   let invertX = false;
+   let invertY = false;
+
+   // If touching near left → reported near max X → inverted
+   if (touch.x > geom.width * 0.8) invertX = true;
+   // If touching near top → reported near max Y → inverted
+   if (touch.y > geom.height * 0.8) invertY = true;
+
+   this.logger.info(logPrefix + ` Inversion detected: invertX=${invertX}, invertY=${invertY}`);
+   return { invertX, invertY };
+};
 
 
 // 2. rotate touchsscreenn
@@ -983,7 +1043,8 @@ display_configuration.prototype.applyTouchCorrection = async function () {
    const self = this;
    const display = self.getDisplaynumber();
    const screen = await self.detectConnectedScreen();
-   const touchcorrection = self.config.get("touchcorrection").value;
+   const touchcorrection = this.config.get("touchcorrection").value;
+   const rotatescreen = (this.config.get("rotatescreen")?.value) || "normal";
 
    // Inline helper
    const runCommand = (cmd) =>
@@ -994,6 +1055,31 @@ display_configuration.prototype.applyTouchCorrection = async function () {
          });
       });
 
+   // rotation matrices (screen orientation)
+   const rotationMatrices = {
+      normal:   [ [1,0,0], [0,1,0], [0,0,1] ],
+      inverted: [ [-1,0,1], [0,-1,1], [0,0,1] ],
+      left:     [ [0,-1,1], [1,0,0], [0,0,1] ],
+      right:    [ [0,1,0], [-1,0,1], [0,0,1] ]
+   };
+
+   // multiply two 3x3 matrices: result = A * B
+   function multiplyMatrix(A, B) {
+      const R = [[0,0,0],[0,0,0],[0,0,0]];
+      for (let i=0;i<3;i++) {
+         for (let j=0;j<3;j++) {
+            let s = 0;
+            for (let k=0;k<3;k++) s += A[i][k] * B[k][j];
+            R[i][j] = s;
+         }
+      }
+      return R;
+   }
+
+   function matrixToString(m) {
+      return `${m[0][0]} ${m[0][1]} ${m[0][2]}  ${m[1][0]} ${m[1][1]} ${m[1][2]}  ${m[2][0]} ${m[2][1]} ${m[2][2]}`;
+   }
+
    try {
       const touchDevices = await self.detectTouchscreen();
       if (!touchDevices || touchDevices.length === 0) {
@@ -1001,17 +1087,76 @@ display_configuration.prototype.applyTouchCorrection = async function () {
          return;
       }
 
+      // load persisted maps/inversions (objects)
+      const mappedObj = self.config.get("touch_mapped_output") || {};
+      const inversionMap = self.config.get("touch_inversion_by_id") || {};
+
       for (let dev of touchDevices) {
          try {
+            // ensure dev.id is string key (config keys are strings)
+            const devKey = String(dev.id);
+
             if (touchcorrection === "automatic") {
-               // Automatic: map to detected screen output
-               await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
-               self.logger.info(
-                  `${logPrefix} Auto-mapped ${dev.name} (id=${dev.id}) → ${screen}`
-               );
+               // 1) map device to output if not already mapped to this screen
+               if (mappedObj[devKey] !== screen) {
+                  await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
+                  mappedObj[devKey] = screen;
+                  self.config.set("touch_mapped_output", mappedObj);
+                  self.logger.info(`${logPrefix} Mapped ${dev.name} (id=${dev.id}) → ${screen} and saved mapping`);
+               } else {
+                  self.logger.info(`${logPrefix} ${dev.name} (id=${dev.id}) already mapped to ${screen}`);
+               }
+
+               // 2) detect inversion per-device if not saved
+               let inversion = inversionMap[devKey];
+               if (!inversion) {
+                  // detectTouchInversion should return {invertX:boolean, invertY:boolean} or null/false
+                  inversion = await self.detectTouchInversion(dev.id, screen);
+                  if (!inversion) inversion = { invertX: false, invertY: false };
+                  inversionMap[devKey] = inversion;
+                  self.config.set("touch_inversion_by_id", inversionMap);
+                  self.logger.info(`${logPrefix} Detected inversion for ${dev.name} id=${dev.id}: ${JSON.stringify(inversion)}`);
+               } else {
+                  self.logger.info(`${logPrefix} Using stored inversion for ${dev.name} id=${dev.id}: ${JSON.stringify(inversion)}`);
+               }
+
+               // 3) build inversion matrix (hardware correction)
+               let inversionMatrix = [ [1,0,0],[0,1,0],[0,0,1] ];
+               if (inversion.invertX && inversion.invertY) {
+                  inversionMatrix = [ [-1,0,1],[0,-1,1],[0,0,1] ];
+               } else if (inversion.invertX) {
+                  inversionMatrix = [ [-1,0,1],[0,1,0],[0,0,1] ];
+               } else if (inversion.invertY) {
+                  inversionMatrix = [ [1,0,0],[0,-1,1],[0,0,1] ];
+               }
+
+               // 4) combine rotation (screen) and hardware inversion.
+               // Order: rotationMatrix * inversionMatrix  (first fix device, then rotate to screen)
+               const rotMatrix = rotationMatrices[rotatescreen] || rotationMatrices.normal;
+               const finalMatrix = multiplyMatrix(rotMatrix, inversionMatrix);
+               const matrixStr = matrixToString(finalMatrix);
+
+               // 5) apply final matrix
+               try {
+                  await runCommand(`DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrixStr}`);
+                  self.logger.info(`${logPrefix} Auto correction applied to ${dev.name} (id=${dev.id}) → matrix=${matrixStr}`);
+               } catch (e) {
+                  // fallback: warn but keep map-to-output (mapping preserved)
+                  self.logger.warn(`${logPrefix} Failed to apply matrix to ${dev.name} (id=${dev.id}). Mapping kept. Error: ${e.message}`);
+               }
+
             } else {
-               // Manual matrix correction
-               let matrix = "1 0 0  0 1 0  0 0 1"; // identity (normal)
+               // Manual modes — still map to output if we have previous mapping or prefer to map always for touchpad/touchscreen
+               if (mappedObj[devKey] !== screen) {
+                  // optional: map once even in manual mode (keeps input confined to screen)
+                  await runCommand(`DISPLAY=${display} xinput --map-to-output ${dev.id} ${screen}`);
+                  mappedObj[devKey] = screen;
+                  self.config.set("touch_mapped_output", mappedObj);
+                  self.logger.info(`${logPrefix} (manual) Mapped ${dev.name} (id=${dev.id}) → ${screen}`);
+               }
+
+               // Manual matrix selection
+               let matrix = "1 0 0  0 1 0  0 0 1";
                switch (touchcorrection) {
                   case "swap-lr": matrix = "0 -1 1  1 0 0  0 0 1"; break;
                   case "swap-ud": matrix = "-1 0 1  0 -1 1  0 0 1"; break;
@@ -1022,24 +1167,15 @@ display_configuration.prototype.applyTouchCorrection = async function () {
                await runCommand(
                   `DISPLAY=${display} xinput set-prop ${dev.id} "Coordinate Transformation Matrix" ${matrix}`
                );
-               self.logger.info(
-                  `${logPrefix} Touch correction: ${touchcorrection} applied to ${dev.name} (id=${dev.id})`
-               );
+               self.logger.info(`${logPrefix} Manual correction applied: ${touchcorrection} → ${dev.name} (id=${dev.id})`);
             }
+
          } catch (err) {
-            if (/property|failed/i.test(err.message)) {
-               self.logger.warn(
-                  `${logPrefix} ${dev.name} (id=${dev.id}) does not support matrix transform`
-               );
-            } else {
-               self.logger.error(
-                  `${logPrefix} Failed to apply correction to ${dev.name} (id=${dev.id}): ${err.message}`
-               );
-            }
+            self.logger.error(`${logPrefix} Failed to handle device ${dev.name} (id=${dev.id}): ${err.message}`);
          }
-      }
+      } // end for devices
    } catch (err) {
-      self.logger.error(logPrefix + " applyTouchCorrection error: " + err.message);
+      self.logger.error(logPrefix + " applyTouchCorrection error: " + (err && err.message ? err.message : err));
    }
 };
 
