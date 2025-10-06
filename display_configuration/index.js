@@ -259,7 +259,7 @@ display_configuration.prototype.writeRotationConfig = function (screen, orientat
       const content =
          `set screen=video=${screen}:panel_orientation=${orientation}\n` +
          `set efifb=video=efifb\n` +
-         `set fbcon=rotate:${fbRotate}\n`;
+         `set fbcon=fbcon=rotate:${fbRotate}\n`;
 
       // Spawn tee to write into the file
       const child = spawn("tee", [boot_screen_rotation], { stdio: ["pipe", "ignore", "pipe"] });
@@ -925,8 +925,8 @@ display_configuration.prototype.applyRotation = async function () {
    const rotationMap = {
       normal: { fbconv: 0, po: "normal" },
       inverted: { fbconv: 2, po: "upside_down" },
-      right: { fbconv: 1, po: "right_side_up" },
-      left: { fbconv: 3, po: "left_side_up" }
+      right: { fbconv: 1, po: "left_side_up" },
+      left: { fbconv: 3, po: "right_side_up" }
    };
 
    const map = rotationMap[rotatescreen] || rotationMap["normal"];
